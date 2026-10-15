@@ -10,6 +10,7 @@ Zamonaviy, qulay va chiroyli online budilnik veb-sayti. Har qanday telefon va ko
 
 - 🔔 **Haqiqiy Maktab Qo'ng'irog'i (MP3):** Belgilangan vaqtda maktab qo'ng'irog'i jaranglaydi.
 - ⏰ **Ko'p rejimli budilnik:** Istalgancha budilnik o'rnatish, yoqish/o'chirish va kechiktirish (Snooze).
+- ⏱️ **Maksimal 15 soniyalik xavfsiz jiringlash:** Budilnik 15 soniyadan oshmasdan jiringlaydi, jonli progress-bar va avtomatik o'chish taymeri bilan jihozlangan.
 - 🎵 **6 xil ohang tanlovi:**
   - 🔔 Qongiroq (Maktab uchun MP3)
   - ⏰ Klassik Budilnik (Raqamli Bi-Bi)

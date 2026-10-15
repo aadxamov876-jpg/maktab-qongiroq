@@ -190,6 +190,28 @@
               </div>
             </div>
 
+            <!-- Ringing Duration (Max 15 seconds) -->
+            <div class="form-row">
+              <div class="form-label-row">
+                <label class="form-label">Jiringlash davomiyligi:</label>
+                <span class="form-hint-badge">Maks. 15 soniya</span>
+              </div>
+              <div class="duration-options">
+                <label class="radio-chip">
+                  <input type="radio" name="ringDuration" value="5">
+                  <span>5 soniya</span>
+                </label>
+                <label class="radio-chip">
+                  <input type="radio" name="ringDuration" value="10">
+                  <span>10 soniya</span>
+                </label>
+                <label class="radio-chip">
+                  <input type="radio" name="ringDuration" value="15" checked>
+                  <span>15 soniya (maksimal)</span>
+                </label>
+              </div>
+            </div>
+
             <!-- Submit Button -->
             <button type="submit" class="btn btn-primary submit-alarm-btn" id="saveAlarmBtn">
               <span class="btn-icon-inside">⏰</span> Budilnikni o'rnatish
@@ -310,6 +332,17 @@
       <h2 class="ringing-time" id="ringingClock">00:00</h2>
       <h3 class="ringing-title" id="ringingTitle">Budilnik</h3>
       <p class="ringing-desc" id="ringingDescription">Rejalashtirilgan vaqt yetib keldi!</p>
+
+      <!-- Auto-stop countdown (max 15s) -->
+      <div class="ringing-autostop-wrap" id="ringingAutoStopWrap">
+        <div class="ringing-autostop-bar">
+          <div class="ringing-autostop-progress" id="ringingProgressBar"></div>
+        </div>
+        <div class="ringing-autostop-text">
+          <span>⏱️ Avtomatik to'xtashga:</span>
+          <strong id="ringingSecondsLeft">15</strong> soniya
+        </div>
+      </div>
 
       <div class="ringing-actions">
         <button class="btn btn-ringing-stop" id="stopAlarmBtn">

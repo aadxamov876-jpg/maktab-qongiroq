@@ -17,6 +17,8 @@ const STATE = {
   alarms: [],
   activeRingingAlarm: null,
   ringingIntervalId: null,
+  ringingTimeoutId: null,
+  ringingCountdownIntervalId: null,
   previewTimeoutId: null,
   previewIntervalId: null,
   timer: {
@@ -53,6 +55,7 @@ class AlarmAudioEngine {
   constructor() {
     this.ctx = null;
     this.isMuted = false;
+    this.engineSafetyTimeoutId = null;
   }
 
   init() {
@@ -171,9 +174,16 @@ class AlarmAudioEngine {
     }
   }
 
-  // Loop pattern until stopped
-  startContinuousRinging(soundType = 'classic') {
+  // Loop pattern until stopped (strictly capped at max 15 seconds)
+  startContinuousRinging(soundType = 'classic', maxDurationSec = 15) {
     this.stopAll();
+
+    // Audio Engine level safety: Never play for more than 15 seconds
+    const safeDurationMs = Math.min(Math.max(maxDurationSec || 15, 1), 15) * 1000;
+    this.engineSafetyTimeoutId = setTimeout(() => {
+      this.stopAll();
+    }, safeDurationMs);
+
     if (soundType === 'qongiroq') {
       this.init();
       const audioEl = document.getElementById('qongiroqAudio') || new Audio('qongiroq.mp3');
@@ -235,6 +245,10 @@ class AlarmAudioEngine {
   }
 
   stopAll() {
+    if (this.engineSafetyTimeoutId) {
+      clearTimeout(this.engineSafetyTimeoutId);
+      this.engineSafetyTimeoutId = null;
+    }
     if (this.qongiroqAudio) {
       try {
         this.qongiroqAudio.pause();
@@ -299,6 +313,9 @@ const DOM = {
   ringingClock: document.getElementById('ringingClock'),
   ringingTitle: document.getElementById('ringingTitle'),
   ringingDescription: document.getElementById('ringingDescription'),
+  ringingProgressBar: document.getElementById('ringingProgressBar'),
+  ringingSecondsLeft: document.getElementById('ringingSecondsLeft'),
+  ringingAutoStopWrap: document.getElementById('ringingAutoStopWrap'),
   stopAlarmBtn: document.getElementById('stopAlarmBtn'),
   snoozeAlarmBtn: document.getElementById('snoozeAlarmBtn'),
   snoozeBtnText: document.getElementById('snoozeBtnText'),
@@ -364,6 +381,13 @@ function loadAlarms() {
     const saved = localStorage.getItem('smart_budilnik_alarms');
     if (saved) {
       STATE.alarms = JSON.parse(saved);
+      // Strictly enforce max 15 seconds ringing duration on all loaded alarms
+      STATE.alarms.forEach(a => {
+        const d = parseInt(a.durationSeconds, 10);
+        if (isNaN(d) || d > 15 || d <= 0) {
+          a.durationSeconds = 15;
+        }
+      });
     }
   } catch (err) {
     console.error("Alarmlarni yuklashda xatolik:", err);
@@ -449,12 +473,16 @@ function checkAlarmTriggers(now) {
   }
 }
 
-// Trigger Alarm Ringing
+// Trigger Alarm Ringing (Max 15 seconds)
 function triggerAlarm(alarm) {
   STATE.activeRingingAlarm = alarm;
 
-  // Sound playback
-  soundEngine.startContinuousRinging(alarm.sound || 'classic');
+  // Enforce max 15 seconds ringing duration
+  const MAX_RING_SECONDS = 15;
+  const durationSec = Math.min(Math.max(parseInt(alarm.durationSeconds || MAX_RING_SECONDS, 10), 1), MAX_RING_SECONDS);
+
+  // Sound playback (capped to durationSec <= 15s)
+  soundEngine.startContinuousRinging(alarm.sound || 'classic', durationSec);
 
   // Update Ringing Modal text
   const timeFormatted = `${String(alarm.hour).padStart(2, '0')}:${String(alarm.minute).padStart(2, '0')}`;
@@ -462,6 +490,46 @@ function triggerAlarm(alarm) {
   DOM.ringingTitle.textContent = alarm.title || "Budilnik";
   DOM.ringingDescription.textContent = `Belgilangan vaqt (${timeFormatted}) yetib keldi!`;
   DOM.snoozeBtnText.textContent = `Kechiktirish (+${alarm.snoozeMinutes || 5} daqiqa)`;
+
+  // Setup auto-stop progress bar and countdown
+  if (DOM.ringingSecondsLeft) {
+    DOM.ringingSecondsLeft.textContent = durationSec;
+  }
+  if (DOM.ringingProgressBar) {
+    DOM.ringingProgressBar.style.transition = 'none';
+    DOM.ringingProgressBar.style.width = '100%';
+    void DOM.ringingProgressBar.offsetWidth; // Force reflow
+    DOM.ringingProgressBar.style.transition = `width ${durationSec}s linear`;
+    DOM.ringingProgressBar.style.width = '0%';
+  }
+
+  // Clear any previous countdown intervals / timeouts
+  if (STATE.ringingTimeoutId) {
+    clearTimeout(STATE.ringingTimeoutId);
+    STATE.ringingTimeoutId = null;
+  }
+  if (STATE.ringingCountdownIntervalId) {
+    clearInterval(STATE.ringingCountdownIntervalId);
+    STATE.ringingCountdownIntervalId = null;
+  }
+
+  // Live countdown ticker (15 -> 0)
+  let secondsRemaining = durationSec;
+  STATE.ringingCountdownIntervalId = setInterval(() => {
+    secondsRemaining--;
+    if (DOM.ringingSecondsLeft) {
+      DOM.ringingSecondsLeft.textContent = Math.max(secondsRemaining, 0);
+    }
+    if (secondsRemaining <= 0) {
+      clearInterval(STATE.ringingCountdownIntervalId);
+      STATE.ringingCountdownIntervalId = null;
+    }
+  }, 1000);
+
+  // Auto-stop alarm after at most 15 seconds
+  STATE.ringingTimeoutId = setTimeout(() => {
+    stopRingingAlarm(true);
+  }, durationSec * 1000);
 
   // Show modal
   DOM.ringingModal.style.display = 'flex';
@@ -474,17 +542,25 @@ function triggerAlarm(alarm) {
 }
 
 // Stop Ringing Alarm
-function stopRingingAlarm() {
+function stopRingingAlarm(isAutoStopped = false) {
+  if (STATE.ringingTimeoutId) {
+    clearTimeout(STATE.ringingTimeoutId);
+    STATE.ringingTimeoutId = null;
+  }
+  if (STATE.ringingCountdownIntervalId) {
+    clearInterval(STATE.ringingCountdownIntervalId);
+    STATE.ringingCountdownIntervalId = null;
+  }
+
   soundEngine.stopAll();
   stopTitleFlash();
   DOM.ringingModal.style.display = 'none';
 
+  if (isAutoStopped) {
+    showToast("Budilnik 15 soniya jiringlab, avtomatik to'xtatildi", "info");
+  }
+
   if (STATE.activeRingingAlarm) {
-    // Optionally disable one-time alarm after ringing
-    const idx = STATE.alarms.findIndex(a => a.id === STATE.activeRingingAlarm.id);
-    if (idx !== -1) {
-      // Leave enabled if user wants it daily or keep as is
-    }
     STATE.activeRingingAlarm = null;
   }
 }
@@ -605,6 +681,7 @@ function renderAlarmsList() {
         </div>
         <div class="alarm-item-info">
           <span class="alarm-item-title">${escapeHtml(alarm.title || "Budilnik")}</span>
+          <span class="alarm-item-duration" title="Jiringlash davomiyligi: maks. 15 soniya">⏱️ ${alarm.durationSeconds || 15}s</span>
           <span class="alarm-item-countdown" data-countdown-id="${alarm.id}">${countdownText}</span>
         </div>
       </div>
@@ -817,6 +894,10 @@ function setupEventListeners() {
     const snoozeRadio = document.querySelector('input[name="snoozeTime"]:checked');
     const snoozeMinutes = snoozeRadio ? parseInt(snoozeRadio.value, 10) : 5;
 
+    // Enforce maximum 15 seconds duration
+    const durationRadio = document.querySelector('input[name="ringDuration"]:checked');
+    const ringDuration = durationRadio ? Math.min(Math.max(parseInt(durationRadio.value, 10) || 15, 1), 15) : 15;
+
     const newAlarm = {
       id: 'alarm_' + Date.now(),
       hour: String(h).padStart(2, '0'),
@@ -825,6 +906,7 @@ function setupEventListeners() {
       title: title,
       sound: sound,
       snoozeMinutes: snoozeMinutes,
+      durationSeconds: ringDuration,
       enabled: true,
       createdAt: Date.now()
     };
@@ -879,7 +961,7 @@ function setupEventListeners() {
   });
 
   // Ringing Modal Actions
-  DOM.stopAlarmBtn.addEventListener('click', stopRingingAlarm);
+  DOM.stopAlarmBtn.addEventListener('click', () => stopRingingAlarm(false));
   DOM.snoozeAlarmBtn.addEventListener('click', snoozeRingingAlarm);
 
   // Setup Timer Tab
@@ -938,7 +1020,8 @@ function setupTimer() {
             minute: new Date().getMinutes(),
             title: "Taymer vaqti tugadi!",
             sound: "siren",
-            snoozeMinutes: 5
+            snoozeMinutes: 5,
+            durationSeconds: 15
           });
         }
       }, 1000);
@@ -1082,6 +1165,29 @@ function escapeHtml(str) {
     "'": '&#39;',
     '"': '&quot;'
   }[tag] || tag));
+}
+
+// Utility: Toast notification
+function showToast(message, type = 'info') {
+  let container = document.getElementById('toastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span>⏱️</span> <span>${escapeHtml(message)}</span>`;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('toast-out');
+    setTimeout(() => {
+      toast.remove();
+    }, 300);
+  }, 3500);
 }
 
 // Initialize on DOM load
