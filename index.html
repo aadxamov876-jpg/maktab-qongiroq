@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Zamonaviy Budilnik & Soat | Online Alarm Clock</title>
-  <meta name="description" content="Aniq vaqtda jiringlaydigan zamonaviy, chiroyli va qulay online budilnik veb-sayti. Turli ohanglar, kechiktirish (snooze) va taymer imkoniyatlari.">
+  <title>SmartQo'ng'iroq | Maktab Qo'ng'irog'i Tizimi</title>
+  <meta name="description" content="Maktab darslari va tanaffuslari uchun avtomatlashtirilgan, aniq vaqtli online qo'ng'iroq tizimi. Haqiqiy maktab qo'ng'irog'i (MP3), 1-smena dars jadvali, dars taymeri va sekundomer.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -21,22 +21,22 @@
     <header class="app-header">
       <div class="logo-area">
         <div class="logo-icon-wrap">
-          <span class="logo-icon">⏰</span>
+          <span class="logo-icon">🔔</span>
           <div class="pulse-ring"></div>
         </div>
         <div class="logo-text">
-          <h1>SmartBudilnik</h1>
-          <span class="badge-status" id="systemStatus">Tizim faol</span>
+          <h1>SmartQo'ng'iroq</h1>
+          <span class="badge-status" id="systemStatus">Qo'ng'iroq tizimi faol</span>
         </div>
       </div>
 
       <!-- Navigation tabs -->
       <nav class="nav-tabs" aria-label="Asosiy bo'limlar">
         <button class="nav-tab active" data-tab="alarmTab" id="tabAlarmBtn">
-          <span class="tab-icon">🔔</span> Budilnik
+          <span class="tab-icon">🔔</span> Qo'ng'iroqlar jadvali
         </button>
         <button class="nav-tab" data-tab="timerTab" id="tabTimerBtn">
-          <span class="tab-icon">⏳</span> Taymer
+          <span class="tab-icon">⏳</span> Dars taymeri
         </button>
         <button class="nav-tab" data-tab="stopwatchTab" id="tabStopwatchBtn">
           <span class="tab-icon">⏱️</span> Sekundomer
@@ -48,7 +48,7 @@
         <button class="btn-icon" id="formatToggleBtn" title="Vaqt formati (24s / 12s)">
           <span id="formatLabel">24H</span>
         </button>
-        <button class="btn-icon" id="soundTestQuickBtn" title="Ovozni sinash">
+        <button class="btn-icon" id="soundTestQuickBtn" title="Maktab qo'ng'irog'ini sinash">
           <span>🔊</span>
         </button>
       </div>
@@ -67,24 +67,31 @@
           <div class="time-ampm" id="currentAmPm"></div>
         </div>
 
-        <!-- Next upcoming alarm indicator -->
+        <!-- Next upcoming bell indicator -->
         <div class="upcoming-banner" id="upcomingBanner">
           <span class="bell-mini">🔔</span>
-          <span id="upcomingAlarmText">Hozircha faol budilnik yo'q</span>
+          <span id="upcomingAlarmText">Hozircha faol qo'ng'iroq yo'q</span>
         </div>
       </div>
     </section>
 
-    <!-- TAB 1: BUDILNIK (ALARM CLOCK) -->
+    <!-- TAB 1: MAKTAB QO'NG'IROQLARI JADVALI -->
     <main class="tab-content active" id="alarmTab">
       <div class="alarm-grid">
-        <!-- Left: Alarm Creation Card -->
+        <!-- Left: Bell Creation Card -->
         <section class="card form-card">
           <div class="card-header">
             <h2 class="card-title">
-              <span class="card-title-icon">➕</span> Yangi budilnik o'rnatish
+              <span class="card-title-icon">➕</span> Yangi qo'ng'iroq o'rnatish
             </h2>
-            <span class="card-subtitle">Budilnik jiringlashi kerak bo'lgan vaqtni kiriting</span>
+            <span class="card-subtitle">Dars boshlanishi yoki tanaffus uchun aniq vaqtni belgilang</span>
+          </div>
+
+          <!-- Quick loader for standard school timetable -->
+          <div class="schedule-quick-loader">
+            <button type="button" class="btn btn-schedule-load" id="loadStandardScheduleBtn" title="1-smena uchun barcha 6 ta dars va tanaffus qo'ng'iroqlarini bitta tugma bilan yuklash">
+              <span class="btn-icon-inside">🏫</span> Standart dars jadvalini yuklash (1-smena)
+            </button>
           </div>
 
           <form id="alarmForm" class="alarm-form">
@@ -93,7 +100,7 @@
               <div class="time-input-group">
                 <label for="alarmHour">Soat</label>
                 <div class="wheel-box">
-                  <input type="number" id="alarmHour" min="0" max="23" placeholder="07" required autocomplete="off">
+                  <input type="number" id="alarmHour" min="0" max="23" placeholder="08" required autocomplete="off">
                   <div class="steppers">
                     <button type="button" class="step-btn" data-step="alarmHour" data-dir="up">▲</button>
                     <button type="button" class="step-btn" data-step="alarmHour" data-dir="down">▼</button>
@@ -106,7 +113,7 @@
               <div class="time-input-group">
                 <label for="alarmMinute">Daqiqa</label>
                 <div class="wheel-box">
-                  <input type="number" id="alarmMinute" min="0" max="59" placeholder="30" required autocomplete="off">
+                  <input type="number" id="alarmMinute" min="0" max="59" placeholder="00" required autocomplete="off">
                   <div class="steppers">
                     <button type="button" class="step-btn" data-step="alarmMinute" data-dir="up">▲</button>
                     <button type="button" class="step-btn" data-step="alarmMinute" data-dir="down">▼</button>
@@ -130,37 +137,56 @@
 
             <!-- Quick Add Pill Buttons -->
             <div class="quick-presets">
-              <span class="presets-label">Tezkor o'rnatish:</span>
+              <span class="presets-label">Dars vaqtlari bo'yicha tezkor o'rnatish:</span>
               <div class="presets-row">
-                <button type="button" class="preset-chip" data-offset="1">+1 daq</button>
+                <button type="button" class="preset-chip" data-time="08:00" data-title="1-Dars boshlanishi">08:00 (1-dars)</button>
+                <button type="button" class="preset-chip" data-time="08:45" data-title="1-Tanaffus (Dars tugashi)">08:45 (Tanaffus)</button>
+                <button type="button" class="preset-chip" data-time="08:50" data-title="2-Dars boshlanishi">08:50 (2-dars)</button>
+                <button type="button" class="preset-chip" data-time="09:35" data-title="Katta tanaffus">09:35 (Katta tanaffus)</button>
+                <button type="button" class="preset-chip" data-time="09:50" data-title="3-Dars boshlanishi">09:50 (3-dars)</button>
+                <button type="button" class="preset-chip" data-time="13:20" data-title="Darslar yakuni (Katta qo'ng'iroq)">13:20 (Dars yakuni)</button>
+                <button type="button" class="preset-chip" data-offset="1">+1 daq (Sinov)</button>
                 <button type="button" class="preset-chip" data-offset="5">+5 daq</button>
-                <button type="button" class="preset-chip" data-offset="15">+15 daq</button>
-                <button type="button" class="preset-chip" data-offset="30">+30 daq</button>
-                <button type="button" class="preset-chip" data-offset="60">+1 soat</button>
               </div>
             </div>
 
-            <!-- Alarm Label / Nomi -->
+            <!-- Bell Label / Dars Nomi -->
             <div class="form-row">
-              <label for="alarmTitle" class="form-label">Budilnik nomi yoki maqsadi:</label>
+              <label for="alarmTitle" class="form-label">Qo'ng'iroq sababi / Dars nomi:</label>
               <div class="input-with-icon">
                 <span class="input-icon">🏷️</span>
-                <input type="text" id="alarmTitle" placeholder="Masalan: Uyg'onish, Dars vaqti, Uchrashuv..." maxlength="40">
+                <input type="text" id="alarmTitle" placeholder="Masalan: 1-Dars boshlanishi, Katta tanaffus..." maxlength="50">
+              </div>
+
+              <!-- Quick Lesson Title Chips -->
+              <div class="quick-title-chips">
+                <span class="title-chips-label">Tezkor tanlash:</span>
+                <div class="title-chips-row">
+                  <button type="button" class="title-chip" data-title="1-Dars boshlanishi">🔔 1-Dars</button>
+                  <button type="button" class="title-chip" data-title="Tanaffus (Dars tugashi)">☕ Tanaffus</button>
+                  <button type="button" class="title-chip" data-title="2-Dars boshlanishi">🔔 2-Dars</button>
+                  <button type="button" class="title-chip" data-title="Katta tanaffus">🥪 Katta tanaffus</button>
+                  <button type="button" class="title-chip" data-title="3-Dars boshlanishi">🔔 3-Dars</button>
+                  <button type="button" class="title-chip" data-title="4-Dars boshlanishi">🔔 4-Dars</button>
+                  <button type="button" class="title-chip" data-title="5-Dars boshlanishi">🔔 5-Dars</button>
+                  <button type="button" class="title-chip" data-title="6-Dars boshlanishi">🔔 6-Dars</button>
+                  <button type="button" class="title-chip" data-title="Darslar yakuni (Katta qo'ng'iroq)">🏁 Darslar yakuni</button>
+                </div>
               </div>
             </div>
 
             <!-- Sound Selection & Volume -->
             <div class="form-row sound-row">
               <div class="sound-select-wrap">
-                <label for="alarmSound" class="form-label">Jiringlash ohangi:</label>
+                <label for="alarmSound" class="form-label">Qo'ng'iroq ohangi:</label>
                 <div class="select-container">
                   <select id="alarmSound">
-                    <option value="qongiroq" selected>🔔 Qongiroq (Maktab uchun)</option>
-                    <option value="classic">⏰ Klassik Budilnik (Raqamli Bi-Bi)</option>
+                    <option value="qongiroq" selected>🔔 Qongiroq (Maktabning haqiqiy qo'ng'irog'i MP3)</option>
                     <option value="school">🏫 Maktab Qo'ng'irog'i (Elektr Zvonok)</option>
                     <option value="melodic">✨ Chiroyli Melodiya (Sehrli Arpeggio)</option>
-                    <option value="siren">🚨 Kuchli Signal (Tezkor Radar)</option>
-                    <option value="gentle">🌅 Yumshoq Tong (Tinchlantiruvchi Chime)</option>
+                    <option value="siren">🚨 Tezkor Signal (Radar)</option>
+                    <option value="gentle">🌅 Yumshoq Tong (Chime)</option>
+                    <option value="classic">⏰ Klassik Budilnik (Raqamli Bi-Bi)</option>
                     <option value="retro">👾 8-Bit Retro Game</option>
                   </select>
                   <audio id="qongiroqAudio" src="qongiroq.mp3" preload="auto"></audio>
@@ -193,7 +219,7 @@
             <!-- Ringing Duration (Max 15 seconds) -->
             <div class="form-row">
               <div class="form-label-row">
-                <label class="form-label">Jiringlash davomiyligi:</label>
+                <label class="form-label">Qo'ng'iroq davomiyligi:</label>
                 <span class="form-hint-badge">Maks. 15 soniya</span>
               </div>
               <div class="duration-options">
@@ -207,54 +233,54 @@
                 </label>
                 <label class="radio-chip">
                   <input type="radio" name="ringDuration" value="15" checked>
-                  <span>15 soniya (maksimal)</span>
+                  <span>15 soniya (tavsiya)</span>
                 </label>
               </div>
             </div>
 
             <!-- Submit Button -->
             <button type="submit" class="btn btn-primary submit-alarm-btn" id="saveAlarmBtn">
-              <span class="btn-icon-inside">⏰</span> Budilnikni o'rnatish
+              <span class="btn-icon-inside">🔔</span> Qo'ng'iroqni o'rnatish
             </button>
           </form>
         </section>
 
-        <!-- Right: Active Alarms List -->
+        <!-- Right: Active Bells List -->
         <section class="card list-card">
           <div class="card-header list-header">
             <div>
               <h2 class="card-title">
-                <span class="card-title-icon">📋</span> Budilniklar ro'yxati
+                <span class="card-title-icon">📋</span> Maktab qo'ng'iroqlari jadvali
               </h2>
-              <span class="card-subtitle" id="alarmCountSubtitle">0 ta o'rnatilgan budilnik</span>
+              <span class="card-subtitle" id="alarmCountSubtitle">0 ta o'rnatilgan qo'ng'iroq</span>
             </div>
             <button class="btn btn-ghost btn-sm" id="clearAllAlarmsBtn" style="display:none;">
-              Hammasini tozalash
+              Barchasini tozalash
             </button>
           </div>
 
-          <!-- Alarms List Container -->
+          <!-- Bells List Container -->
           <div class="alarms-list" id="alarmsList">
             <!-- Dynamic elements injected by app.js -->
             <div class="empty-state" id="emptyState">
               <div class="empty-icon">🔔</div>
-              <h3>Hozircha budilnik belgilanmagan</h3>
-              <p>Chap tarafdagi bo'lim orqali kerakli vaqtni kiriting va budilnikni o'rnating.</p>
+              <h3>Hozircha qo'ng'iroq belgilanmagan</h3>
+              <p>Chap tarafdagi bo'lim orqali dars vaqtlarini belgilang yoki "Standart dars jadvalini yuklash" tugmasini bosing.</p>
             </div>
           </div>
         </section>
       </div>
     </main>
 
-    <!-- TAB 2: TAYMER (COUNTDOWN TIMER) -->
+    <!-- TAB 2: TAYMER (DARS VA TANAFFUS TAYMERI) -->
     <section class="tab-content" id="timerTab">
       <div class="card timer-card">
         <div class="card-header text-center">
-          <h2 class="card-title">⏳ Teskari hisoblagich (Taymer)</h2>
-          <span class="card-subtitle">Belgilangan vaqtdan keyin signal beradi</span>
+          <h2 class="card-title">⏳ Dars va Tanaffus taymeri</h2>
+          <span class="card-subtitle">Dars yoki tanaffus davomiyligini aniq nazorat qilish uchun teskari hisoblagich</span>
         </div>
 
-        <div class="timer-display-box" id="timerDisplay">00:00:00</div>
+        <div class="timer-display-box" id="timerDisplay">00:45:00</div>
 
         <!-- Timer inputs when stopped -->
         <div class="timer-inputs" id="timerInputsWrap">
@@ -263,7 +289,7 @@
             <span>Soat</span>
           </div>
           <div class="timer-field">
-            <input type="number" id="timerM" min="0" max="59" value="05" placeholder="00">
+            <input type="number" id="timerM" min="0" max="59" value="45" placeholder="00">
             <span>Daqiqa</span>
           </div>
           <div class="timer-field">
@@ -274,11 +300,11 @@
 
         <!-- Timer quick pills -->
         <div class="timer-presets">
-          <button class="preset-chip timer-set" data-sec="60">1 daq</button>
-          <button class="preset-chip timer-set" data-sec="300">5 daq</button>
-          <button class="preset-chip timer-set" data-sec="600">10 daq</button>
-          <button class="preset-chip timer-set" data-sec="1500">25 daq (Pomodoro)</button>
-          <button class="preset-chip timer-set" data-sec="3600">1 soat</button>
+          <button class="preset-chip timer-set" data-sec="2700">45 daq (1-Dars)</button>
+          <button class="preset-chip timer-set" data-sec="300">5 daq (Tanaffus)</button>
+          <button class="preset-chip timer-set" data-sec="900">15 daq (Katta tanaffus)</button>
+          <button class="preset-chip timer-set" data-sec="1200">20 daq (Nazorat ishi)</button>
+          <button class="preset-chip timer-set" data-sec="60">1 daq (Sinov)</button>
         </div>
 
         <!-- Timer controls -->
@@ -294,8 +320,8 @@
     <section class="tab-content" id="stopwatchTab">
       <div class="card stopwatch-card">
         <div class="card-header text-center">
-          <h2 class="card-title">⏱️ Sekundomer</h2>
-          <span class="card-subtitle">Millisekundgacha aniq vaqt o'lchovchisi</span>
+          <h2 class="card-title">⏱️ Maktab Sekundomeri</h2>
+          <span class="card-subtitle">Jismoniy tarbiya, sport musobaqalari va tadbirlar uchun aniq vaqt o'lchovchisi</span>
         </div>
 
         <div class="stopwatch-display-box" id="stopwatchDisplay">00:00:00.<span class="millis">00</span></div>
@@ -316,7 +342,7 @@
     <!-- Footer info -->
     <footer class="app-footer">
       <div class="footer-content">
-        <p class="footer-note">💡 <strong>Eslatma:</strong> Budilnik jiringlashi uchun brauzer oynasini yopmang. Kompyuteringiz ovozi yoqilganligiga ishonch hosil qiling.</p>
+        <p class="footer-note">💡 <strong>Eslatma:</strong> Maktab qo'ng'irog'i aniq vaqtda chalinishi uchun ushbu brauzer oynasini yopmang. Kompyuteringiz karnayi (dinamiki) ovozi yoqilganligiga ishonch hosil qiling.</p>
         <div class="footer-credit-badge">
           <span class="badge-icon">🎓</span>
           <span class="badge-text">Sirdaryo viloyat Guliston shahar 14-Umumiy o'rta ta'lim maktabining o'quvchisi <strong class="badge-author">Ablazov Doniyor</strong></span>
@@ -325,7 +351,7 @@
     </footer>
   </div>
 
-  <!-- ================= ALARM RINGING FULLSCREEN MODAL ================= -->
+  <!-- ================= BELL RINGING FULLSCREEN MODAL ================= -->
   <div class="alarm-ringing-modal" id="ringingModal" role="dialog" aria-modal="true" aria-labelledby="ringingTitle" style="display:none;">
     <div class="ringing-overlay"></div>
     <div class="ringing-card">
@@ -334,10 +360,10 @@
         <div class="ringing-bell">🔔</div>
       </div>
 
-      <div class="ringing-badge">DIQQAT! VAQT BO'LDI</div>
+      <div class="ringing-badge">🔔 MAKTAB QO'NG'IROG'I CHALINMOQDA!</div>
       <h2 class="ringing-time" id="ringingClock">00:00</h2>
-      <h3 class="ringing-title" id="ringingTitle">Budilnik</h3>
-      <p class="ringing-desc" id="ringingDescription">Rejalashtirilgan vaqt yetib keldi!</p>
+      <h3 class="ringing-title" id="ringingTitle">Dars qo'ng'irog'i</h3>
+      <p class="ringing-desc" id="ringingDescription">Dars yoki tanaffus vaqti yetib keldi!</p>
 
       <!-- Auto-stop countdown (max 15s) -->
       <div class="ringing-autostop-wrap" id="ringingAutoStopWrap">
@@ -352,7 +378,7 @@
 
       <div class="ringing-actions">
         <button class="btn btn-ringing-stop" id="stopAlarmBtn">
-          <span class="icon">🛑</span> Budilnikni o'chirish
+          <span class="icon">🛑</span> Qo'ng'iroqni to'xtatish
         </button>
         <button class="btn btn-ringing-snooze" id="snoozeAlarmBtn">
           <span class="icon">💤</span> <span id="snoozeBtnText">Kechiktirish (+5 daqiqa)</span>
@@ -364,7 +390,7 @@
   <!-- Audio unlock banner if autoplay is blocked -->
   <div class="audio-banner" id="audioUnlockBanner">
     <div class="banner-content">
-      <span>🔊 Budilnik ovozi to'siqsiz ishlashi uchun sahifaga bir marotaba bosing yoki ovozni faollashtiring:</span>
+      <span>🔊 Maktab qo'ng'irog'i ovozi to'siqsiz chalinishi uchun sahifaga bir marotaba bosing:</span>
       <button class="btn btn-sm btn-primary" id="unlockAudioBtn">Ovozni faollashtirish</button>
     </div>
   </div>

@@ -1501,6 +1501,11 @@ input:checked + .slider:before {
   border-color: rgba(245, 158, 11, 0.5);
 }
 
+.toast.toast-success {
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 15px rgba(16, 185, 129, 0.25);
+}
+
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(-12px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -1510,3 +1515,90 @@ input:checked + .slider:before {
   opacity: 0;
   transform: translateY(-8px) scale(0.95);
 }
+
+/* School Schedule Quick Loader Button */
+.schedule-quick-loader {
+  margin-bottom: 20px;
+}
+
+.btn-schedule-load {
+  width: 100%;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(99, 102, 241, 0.15));
+  border: 1px dashed rgba(56, 189, 248, 0.45);
+  color: #38bdf8;
+  font-size: 0.94rem;
+  font-weight: 600;
+  padding: 13px 18px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all var(--transition-normal);
+}
+
+.btn-schedule-load:hover {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(99, 102, 241, 0.25));
+  border-color: #38bdf8;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 18px rgba(56, 189, 248, 0.25);
+}
+
+.btn-schedule-load:active {
+  transform: translateY(0);
+}
+
+/* Quick Title Chips */
+.quick-title-chips {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title-chips-label {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.title-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.title-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: #94a3b8;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 5px 11px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.title-chip:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.45);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.title-chip:active {
+  transform: scale(0.96);
+}
+
+/* Button Disabled & Success States */
+.btn:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+

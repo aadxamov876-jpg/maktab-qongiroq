@@ -1,14 +1,16 @@
 /**
  * ==========================================================
- * SMART BUDILNIK - CORE JAVASCRIPT APPLICATION
+ * SMART QO'NG'IROQ - MAKTAB AVTOMATIK QO'NG'IROQ TIZIMI
  * ==========================================================
- * Features:
- * - Real-time Digital Clock with Uzbek localization & 12/24H format
- * - Web Audio API Synthesizer (No external sound files required)
- * - Persistent Alarms (localStorage) with snooze & toggle
- * - Fullscreen Ringing Modal with vibration & visual alerts
- * - Countdown display & next upcoming alarm indicator
- * - Integrated Countdown Timer & Stopwatch with laps
+ * Xususiyatlar:
+ * - Real-time raqamli soat (O'zbekcha mahalliylashtirish & 12/24H format)
+ * - Haqiqiy maktab qo'ng'irog'i (MP3) va Web Audio API sintezatori
+ * - Standart 1-smena dars jadvalini bitta tugma bilan yuklash (6 ta dars va tanaffuslar)
+ * - Tezkor dars nomlari tanlagichi (1-dars, tanaffus, katta tanaffus...)
+ * - Saqlanadigan qo'ng'iroqlar (localStorage) va kechiktirish (snooze)
+ * - To'liq ekranli jarangdor ogohlantirish oynasi (maks. 15 soniya xavfsiz davomiylik)
+ * - Dars va tanaffus taymeri (45 daq, 5 daq, 15 daq, 20 daq)
+ * - Sport mashg'ulotlari va musobaqalar uchun sekundomer
  */
 
 // State Management
@@ -22,8 +24,8 @@ const STATE = {
   previewTimeoutId: null,
   previewIntervalId: null,
   timer: {
-    totalSeconds: 300,
-    remainingSeconds: 300,
+    totalSeconds: 2700, // 45 minutes default for school lesson
+    remainingSeconds: 2700,
     isRunning: false,
     intervalId: null
   },
@@ -47,15 +49,33 @@ const UZ_DAYS = [
   "Payshanba", "Juma", "Shanba"
 ];
 
+// Standart 1-smena maktab dars jadvali
+const STANDARD_SCHOOL_SCHEDULE = [
+  { hour: "08", minute: "00", second: "00", title: "1-Dars boshlanishi" },
+  { hour: "08", minute: "45", second: "00", title: "1-Tanaffus (Dars tugashi)" },
+  { hour: "08", minute: "50", second: "00", title: "2-Dars boshlanishi" },
+  { hour: "09", minute: "35", second: "00", title: "Katta tanaffus (2-dars yakuni)" },
+  { hour: "09", minute: "50", second: "00", title: "3-Dars boshlanishi" },
+  { hour: "10", minute: "35", second: "00", title: "3-Tanaffus (Dars tugashi)" },
+  { hour: "10", minute: "45", second: "00", title: "4-Dars boshlanishi" },
+  { hour: "11", minute: "30", second: "00", title: "4-Tanaffus (Dars tugashi)" },
+  { hour: "11", minute: "40", second: "00", title: "5-Dars boshlanishi" },
+  { hour: "12", minute: "25", second: "00", title: "5-Tanaffus (Dars tugashi)" },
+  { hour: "12", minute: "35", second: "00", title: "6-Dars boshlanishi" },
+  { hour: "13", minute: "20", second: "00", title: "Darslar yakuni (Katta qo'ng'iroq)" }
+];
+
 /* ==========================================================
    WEB AUDIO API SOUND ENGINE
-   Produces crisp, reliable tones without any external audio files
+   Produces crisp, reliable tones without external audio dependencies
+   Also manages qongiroq.mp3 audio playback safely
    ========================================================== */
 class AlarmAudioEngine {
   constructor() {
     this.ctx = null;
     this.isMuted = false;
     this.engineSafetyTimeoutId = null;
+    this.qongiroqAudio = null;
   }
 
   init() {
@@ -70,7 +90,7 @@ class AlarmAudioEngine {
     }
   }
 
-  // Play single note
+  // Play single synthesized note
   playTone(freq, type = 'sine', duration = 0.2, startTime = 0, volume = 0.3) {
     if (!this.ctx) this.init();
     if (!this.ctx) return;
@@ -98,30 +118,20 @@ class AlarmAudioEngine {
   }
 
   // Ring pattern by sound profile
-  playAlarmPattern(soundType = 'classic') {
+  playAlarmPattern(soundType = 'qongiroq') {
     this.init();
     if (!this.ctx) return;
 
     switch (soundType) {
-      case 'classic': {
-        // Double digital beep: Beep-Beep ... Beep-Beep
-        this.playTone(1046.5, 'square', 0.12, 0, 0.25); // C6
-        this.playTone(1046.5, 'square', 0.12, 0.18, 0.25);
-        this.playTone(1318.5, 'square', 0.12, 0.45, 0.3); // E6
-        this.playTone(1318.5, 'square', 0.12, 0.63, 0.3);
-        break;
-      }
       case 'school': {
-        // Maktab qo'ng'irog'i: Elektr metall qo'ng'iroq (tezkor vibro-zarbalar va jarangdor metall sado)
-        if (!this.ctx) return;
+        // Maktab elektr qo'ng'irog'i (zvonok)
         const strikeCount = 18;
         for (let i = 0; i < strikeCount; i++) {
-          const t = i * 0.046; // Har 46ms da bolg'acha qo'ng'iroqqa uriladi (~22 Hz)
-          this.playTone(1661.22, 'triangle', 0.055, t, 0.26); // G#6 metall jiringlash
-          this.playTone(2489.02, 'sine', 0.04, t, 0.18);     // D#7 yuqori garmonika
-          this.playTone(830.61, 'sine', 0.08, t, 0.14);      // G#5 asosiy korpus sadolari
+          const t = i * 0.046;
+          this.playTone(1661.22, 'triangle', 0.055, t, 0.26);
+          this.playTone(2489.02, 'sine', 0.04, t, 0.18);
+          this.playTone(830.61, 'sine', 0.08, t, 0.14);
         }
-        // Qo'ng'iroqning jarangdor aks-sadosi
         this.playTone(1661.22, 'sine', 0.4, 18 * 0.046, 0.18);
         break;
       }
@@ -133,9 +143,16 @@ class AlarmAudioEngine {
         });
         break;
       }
+      case 'classic': {
+        // Double digital beep: Beep-Beep ... Beep-Beep
+        this.playTone(1046.5, 'square', 0.12, 0, 0.25);
+        this.playTone(1046.5, 'square', 0.12, 0.18, 0.25);
+        this.playTone(1318.5, 'square', 0.12, 0.45, 0.3);
+        this.playTone(1318.5, 'square', 0.12, 0.63, 0.3);
+        break;
+      }
       case 'siren': {
         // Urgent rising siren pulse
-        if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sawtooth';
@@ -175,7 +192,7 @@ class AlarmAudioEngine {
   }
 
   // Loop pattern until stopped (strictly capped at max 15 seconds)
-  startContinuousRinging(soundType = 'classic', maxDurationSec = 15) {
+  startContinuousRinging(soundType = 'qongiroq', maxDurationSec = 15) {
     this.stopAll();
 
     // Audio Engine level safety: Never play for more than 15 seconds
@@ -196,6 +213,7 @@ class AlarmAudioEngine {
       }
       return;
     }
+
     this.playAlarmPattern(soundType);
     const intervalMs = soundType === 'melodic' ? 1200 : (soundType === 'gentle' ? 1500 : (soundType === 'school' ? 1050 : 900));
     STATE.ringingIntervalId = setInterval(() => {
@@ -204,8 +222,9 @@ class AlarmAudioEngine {
   }
 
   // Play quick sample (preview)
-  previewSound(soundType = 'classic', onEndCallback) {
+  previewSound(soundType = 'qongiroq', onEndCallback) {
     this.stopAll();
+
     if (soundType === 'qongiroq') {
       this.init();
       const audioEl = document.getElementById('qongiroqAudio') || new Audio('qongiroq.mp3');
@@ -228,7 +247,7 @@ class AlarmAudioEngine {
 
       STATE.previewTimeoutId = setTimeout(() => {
         handleEnd();
-      }, 6000);
+      }, 5500);
       return;
     }
 
@@ -293,7 +312,7 @@ const DOM = {
   navTabs: document.querySelectorAll('.nav-tab'),
   tabContents: document.querySelectorAll('.tab-content'),
 
-  // Alarm Form
+  // Bell Form
   alarmForm: document.getElementById('alarmForm'),
   alarmHour: document.getElementById('alarmHour'),
   alarmMinute: document.getElementById('alarmMinute'),
@@ -306,7 +325,7 @@ const DOM = {
   emptyState: document.getElementById('emptyState'),
   alarmCountSubtitle: document.getElementById('alarmCountSubtitle'),
   clearAllAlarmsBtn: document.getElementById('clearAllAlarmsBtn'),
-  presetChips: document.querySelectorAll('.preset-chip[data-offset]'),
+  loadStandardScheduleBtn: document.getElementById('loadStandardScheduleBtn'),
 
   // Ringing Modal
   ringingModal: document.getElementById('ringingModal'),
@@ -351,7 +370,7 @@ function initApp() {
   loadAlarms();
   setupEventListeners();
   updateLiveClock();
-  setInterval(updateLiveClock, 500); // Check time & alarms twice every second
+  setInterval(updateLiveClock, 500); // Check time & bells twice every second
 
   // Set default form time to +5 minutes from now
   setDefaultFormTime(5);
@@ -370,46 +389,88 @@ function setDefaultFormTime(minutesOffset = 5) {
   const h = String(now.getHours()).padStart(2, '0');
   const m = String(now.getMinutes()).padStart(2, '0');
 
-  DOM.alarmHour.value = h;
-  DOM.alarmMinute.value = m;
-  DOM.alarmSecond.value = "00";
+  if (DOM.alarmHour) DOM.alarmHour.value = h;
+  if (DOM.alarmMinute) DOM.alarmMinute.value = m;
+  if (DOM.alarmSecond) DOM.alarmSecond.value = "00";
 }
 
-// Load alarms from localStorage
+// Load bells from localStorage (with legacy compatibility)
 function loadAlarms() {
   try {
-    const saved = localStorage.getItem('smart_budilnik_alarms');
+    let saved = localStorage.getItem('smart_qongiroq_alarms');
+    if (!saved) {
+      saved = localStorage.getItem('smart_budilnik_alarms');
+    }
+
     if (saved) {
       STATE.alarms = JSON.parse(saved);
-      // Strictly enforce max 15 seconds ringing duration on all loaded alarms
+      // Strictly enforce max 15 seconds ringing duration on all loaded bells
       STATE.alarms.forEach(a => {
         const d = parseInt(a.durationSeconds, 10);
         if (isNaN(d) || d > 15 || d <= 0) {
           a.durationSeconds = 15;
         }
+        if (!a.sound) a.sound = 'qongiroq';
       });
     }
   } catch (err) {
-    console.error("Alarmlarni yuklashda xatolik:", err);
+    console.error("Qo'ng'iroqlarni yuklashda xatolik:", err);
     STATE.alarms = [];
   }
   renderAlarmsList();
   updateUpcomingAlarmBadge();
 }
 
-// Save alarms to localStorage
+// Save bells to localStorage
 function saveAlarms() {
   try {
-    localStorage.setItem('smart_budilnik_alarms', JSON.stringify(STATE.alarms));
+    localStorage.setItem('smart_qongiroq_alarms', JSON.stringify(STATE.alarms));
   } catch (err) {
-    console.error("Alarmlarni saqlashda xatolik:", err);
+    console.error("Qo'ng'iroqlarni saqlashda xatolik:", err);
   }
   renderAlarmsList();
   updateUpcomingAlarmBadge();
 }
 
 /* ==========================================================
-   LIVE CLOCK & ALARM TICKER
+   STANDARD SCHOOL TIMETABLE LOADER
+   ========================================================== */
+function loadStandardSchoolSchedule() {
+  if (STATE.alarms.length > 0) {
+    const shouldAdd = confirm("Standart 1-smena dars jadvali (barcha 6 ta dars va tanaffus qo'ng'iroqlari) qo'shilsinmi?");
+    if (!shouldAdd) return;
+  }
+
+  let addedCount = 0;
+  STANDARD_SCHOOL_SCHEDULE.forEach((item, index) => {
+    const exists = STATE.alarms.some(a => a.hour === item.hour && a.minute === item.minute);
+    if (!exists) {
+      STATE.alarms.push({
+        id: 'bell_std_' + Date.now() + '_' + index,
+        hour: item.hour,
+        minute: item.minute,
+        second: item.second,
+        title: item.title,
+        sound: 'qongiroq',
+        snoozeMinutes: 5,
+        durationSeconds: 15,
+        enabled: true,
+        createdAt: Date.now() + index
+      });
+      addedCount++;
+    }
+  });
+
+  saveAlarms();
+  if (addedCount > 0) {
+    showToast(`🏫 1-smena dars jadvali (${addedCount} ta qo'ng'iroq) yuklandi!`, "success");
+  } else {
+    showToast("Jadvaldagi qo'ng'iroqlar avvaldan mavjud", "info");
+  }
+}
+
+/* ==========================================================
+   LIVE CLOCK & BELL TICKER
    ========================================================== */
 function updateLiveClock() {
   const now = new Date();
@@ -419,7 +480,9 @@ function updateLiveClock() {
   const dayNum = now.getDate();
   const monthName = UZ_MONTHS[now.getMonth()];
   const year = now.getFullYear();
-  DOM.currentDate.textContent = `${dayName}, ${dayNum}-${monthName}, ${year}`;
+  if (DOM.currentDate) {
+    DOM.currentDate.textContent = `${dayName}, ${dayNum}-${monthName}, ${year}`;
+  }
 
   // Time format calculations
   let hours = now.getHours();
@@ -430,17 +493,21 @@ function updateLiveClock() {
   if (!STATE.is24Hour) {
     ampm = hours >= 12 ? "PM" : "AM";
     hours = hours % 12;
-    hours = hours ? hours : 12; // 0 becomes 12
+    hours = hours ? hours : 12;
   }
 
   const hoursStr = String(hours).padStart(2, '0');
-  DOM.currentTime.textContent = `${hoursStr}:${minutes}:${seconds}`;
-  DOM.currentAmPm.textContent = ampm;
+  if (DOM.currentTime) {
+    DOM.currentTime.textContent = `${hoursStr}:${minutes}:${seconds}`;
+  }
+  if (DOM.currentAmPm) {
+    DOM.currentAmPm.textContent = ampm;
+  }
 
-  // Check active alarms
+  // Check active bells
   checkAlarmTriggers(now);
 
-  // Update countdowns on alarm cards every 10 seconds or when minute rolls
+  // Update countdowns on bell cards every 10 seconds or when minute rolls
   if (now.getSeconds() % 10 === 0) {
     updateUpcomingAlarmBadge();
     updateAlarmsCountdownBadges();
@@ -448,7 +515,7 @@ function updateLiveClock() {
 }
 
 /* ==========================================================
-   ALARM TRIGGER CHECKER
+   BELL TRIGGER CHECKER
    ========================================================== */
 function checkAlarmTriggers(now) {
   // If already ringing, don't trigger another one right over it
@@ -473,7 +540,7 @@ function checkAlarmTriggers(now) {
   }
 }
 
-// Trigger Alarm Ringing (Max 15 seconds)
+// Trigger Bell Ringing (Max 15 seconds)
 function triggerAlarm(alarm) {
   STATE.activeRingingAlarm = alarm;
 
@@ -481,15 +548,19 @@ function triggerAlarm(alarm) {
   const MAX_RING_SECONDS = 15;
   const durationSec = Math.min(Math.max(parseInt(alarm.durationSeconds || MAX_RING_SECONDS, 10), 1), MAX_RING_SECONDS);
 
-  // Sound playback (capped to durationSec <= 15s)
-  soundEngine.startContinuousRinging(alarm.sound || 'classic', durationSec);
+  // Sound playback (default: qongiroq MP3)
+  soundEngine.startContinuousRinging(alarm.sound || 'qongiroq', durationSec);
 
   // Update Ringing Modal text
   const timeFormatted = `${String(alarm.hour).padStart(2, '0')}:${String(alarm.minute).padStart(2, '0')}`;
-  DOM.ringingClock.textContent = timeFormatted;
-  DOM.ringingTitle.textContent = alarm.title || "Budilnik";
-  DOM.ringingDescription.textContent = `Belgilangan vaqt (${timeFormatted}) yetib keldi!`;
-  DOM.snoozeBtnText.textContent = `Kechiktirish (+${alarm.snoozeMinutes || 5} daqiqa)`;
+  if (DOM.ringingClock) DOM.ringingClock.textContent = timeFormatted;
+  if (DOM.ringingTitle) DOM.ringingTitle.textContent = alarm.title || "Dars qo'ng'irog'i";
+  if (DOM.ringingDescription) {
+    DOM.ringingDescription.textContent = `Rejalashtirilgan vaqt (${timeFormatted}) yetib keldi! Dars yoki tanaffus boshlandi.`;
+  }
+  if (DOM.snoozeBtnText) {
+    DOM.snoozeBtnText.textContent = `Kechiktirish (+${alarm.snoozeMinutes || 5} daqiqa)`;
+  }
 
   // Setup auto-stop progress bar and countdown
   if (DOM.ringingSecondsLeft) {
@@ -526,22 +597,22 @@ function triggerAlarm(alarm) {
     }
   }, 1000);
 
-  // Auto-stop alarm after at most 15 seconds
+  // Auto-stop bell after at most 15 seconds
   STATE.ringingTimeoutId = setTimeout(() => {
     stopRingingAlarm(true);
   }, durationSec * 1000);
 
   // Show modal
-  DOM.ringingModal.style.display = 'flex';
+  if (DOM.ringingModal) DOM.ringingModal.style.display = 'flex';
 
   // Flash tab title
-  startTitleFlash(alarm.title || "Budilnik");
+  startTitleFlash(alarm.title || "Dars qo'ng'irog'i");
 
   // Web Notification
   showDesktopNotification(alarm);
 }
 
-// Stop Ringing Alarm
+// Stop Ringing Bell
 function stopRingingAlarm(isAutoStopped = false) {
   if (STATE.ringingTimeoutId) {
     clearTimeout(STATE.ringingTimeoutId);
@@ -554,10 +625,10 @@ function stopRingingAlarm(isAutoStopped = false) {
 
   soundEngine.stopAll();
   stopTitleFlash();
-  DOM.ringingModal.style.display = 'none';
+  if (DOM.ringingModal) DOM.ringingModal.style.display = 'none';
 
   if (isAutoStopped) {
-    showToast("Budilnik 15 soniya jiringlab, avtomatik to'xtatildi", "info");
+    showToast("Maktab qo'ng'irog'i 15 soniya jaranglab, avtomatik to'xtatildi", "info");
   }
 
   if (STATE.activeRingingAlarm) {
@@ -565,7 +636,7 @@ function stopRingingAlarm(isAutoStopped = false) {
   }
 }
 
-// Snooze Ringing Alarm
+// Snooze Ringing Bell
 function snoozeRingingAlarm() {
   if (!STATE.activeRingingAlarm) return;
 
@@ -580,7 +651,7 @@ function snoozeRingingAlarm() {
   const newM = String(targetDate.getMinutes()).padStart(2, '0');
   const newS = String(targetDate.getSeconds()).padStart(2, '0');
 
-  // Update existing alarm or create temporary snooze alarm
+  // Update existing bell
   const idx = STATE.alarms.findIndex(a => a.id === currentAlarm.id);
   if (idx !== -1) {
     STATE.alarms[idx].hour = newH;
@@ -602,7 +673,7 @@ function startTitleFlash(title) {
   if (titleFlashInterval) clearInterval(titleFlashInterval);
   let toggle = false;
   titleFlashInterval = setInterval(() => {
-    document.title = toggle ? `🚨 BUDILNIK: ${title}! 🚨` : `⏰ JIRINGLAMOQDA! ⏰`;
+    document.title = toggle ? `🔔 QO'NG'IROQ: ${title}! 🔔` : `🔔 JIRINGLAMOQDA! 🔔`;
     toggle = !toggle;
   }, 500);
 }
@@ -619,8 +690,8 @@ function stopTitleFlash() {
 function showDesktopNotification(alarm) {
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
-      new Notification(`Budilnik: ${alarm.title || "Vaqt bo'ldi!"}`, {
-        body: `${String(alarm.hour).padStart(2, '0')}:${String(alarm.minute).padStart(2, '0')} - Rejalashtirilgan vaqt yetib keldi!`,
+      new Notification(`Maktab Qo'ng'irog'i: ${alarm.title || "Vaqt bo'ldi!"}`, {
+        body: `${String(alarm.hour).padStart(2, '0')}:${String(alarm.minute).padStart(2, '0')} - Dars yoki tanaffus vaqti yetib keldi!`,
         icon: 'https://cdn-icons-png.flaticon.com/512/864/864685.png',
         requireInteraction: true
       });
@@ -631,22 +702,31 @@ function showDesktopNotification(alarm) {
 }
 
 /* ==========================================================
-   ALARM LIST RENDERING & MANAGEMENT
+   BELLS LIST RENDERING & MANAGEMENT
    ========================================================== */
 function renderAlarmsList() {
+  if (!DOM.alarmsList) return;
   DOM.alarmsList.innerHTML = '';
 
   if (STATE.alarms.length === 0) {
-    DOM.emptyState.style.display = 'flex';
-    DOM.alarmsList.appendChild(DOM.emptyState);
-    DOM.alarmCountSubtitle.textContent = "0 ta o'rnatilgan budilnik";
-    DOM.clearAllAlarmsBtn.style.display = 'none';
+    if (DOM.emptyState) {
+      DOM.emptyState.style.display = 'flex';
+      DOM.alarmsList.appendChild(DOM.emptyState);
+    }
+    if (DOM.alarmCountSubtitle) {
+      DOM.alarmCountSubtitle.textContent = "0 ta o'rnatilgan qo'ng'iroq";
+    }
+    if (DOM.clearAllAlarmsBtn) {
+      DOM.clearAllAlarmsBtn.style.display = 'none';
+    }
     return;
   }
 
-  DOM.emptyState.style.display = 'none';
-  DOM.clearAllAlarmsBtn.style.display = 'inline-block';
-  DOM.alarmCountSubtitle.textContent = `${STATE.alarms.length} ta o'rnatilgan budilnik`;
+  if (DOM.emptyState) DOM.emptyState.style.display = 'none';
+  if (DOM.clearAllAlarmsBtn) DOM.clearAllAlarmsBtn.style.display = 'inline-block';
+  if (DOM.alarmCountSubtitle) {
+    DOM.alarmCountSubtitle.textContent = `${STATE.alarms.length} ta rejalashtirilgan qo'ng'iroq`;
+  }
 
   // Sort by next ringing time
   const sortedAlarms = [...STATE.alarms].sort((a, b) => {
@@ -680,13 +760,13 @@ function renderAlarmsList() {
           ${ampmStr ? `<span class="alarm-item-ampm">${ampmStr}</span>` : ''}
         </div>
         <div class="alarm-item-info">
-          <span class="alarm-item-title">${escapeHtml(alarm.title || "Budilnik")}</span>
-          <span class="alarm-item-duration" title="Jiringlash davomiyligi: maks. 15 soniya">⏱️ ${alarm.durationSeconds || 15}s</span>
+          <span class="alarm-item-title">${escapeHtml(alarm.title || "Dars qo'ng'irog'i")}</span>
+          <span class="alarm-item-duration" title="Qo'ng'iroq davomiyligi: maks. 15 soniya">⏱️ ${alarm.durationSeconds || 15}s</span>
           <span class="alarm-item-countdown" data-countdown-id="${alarm.id}">${countdownText}</span>
         </div>
       </div>
       <div class="alarm-item-right">
-        <label class="switch" title="${alarm.enabled ? "Budilnikni o'chirish" : "Budilnikni yoqish"}">
+        <label class="switch" title="${alarm.enabled ? "Qo'ng'iroqni o'chirish" : "Qo'ng'iroqni yoqish"}">
           <input type="checkbox" class="alarm-toggle" data-id="${alarm.id}" ${alarm.enabled ? 'checked' : ''}>
           <span class="slider"></span>
         </label>
@@ -709,7 +789,7 @@ function updateAlarmsCountdownBadges() {
   });
 }
 
-// Calculate milliseconds until alarm triggers next
+// Calculate milliseconds until bell triggers next
 function getTimeDifferenceMs(alarm) {
   const now = new Date();
   const target = new Date();
@@ -743,12 +823,14 @@ function getCountdownText(alarm) {
   return `${hours} soat ${minutes} daqiqadan so'ng`;
 }
 
-// Update the top hero banner with the nearest upcoming alarm
+// Update the top hero banner with the nearest upcoming bell
 function updateUpcomingAlarmBadge() {
+  if (!DOM.upcomingBanner || !DOM.upcomingAlarmText) return;
+
   const activeAlarms = STATE.alarms.filter(a => a.enabled);
   if (activeAlarms.length === 0) {
     DOM.upcomingBanner.className = "upcoming-banner";
-    DOM.upcomingAlarmText.textContent = "Hozircha faol budilnik yo'q";
+    DOM.upcomingAlarmText.textContent = "Hozircha faol qo'ng'iroq yo'q";
     return;
   }
 
@@ -766,9 +848,10 @@ function updateUpcomingAlarmBadge() {
 
   const timeStr = `${String(nearest.hour).padStart(2, '0')}:${String(nearest.minute).padStart(2, '0')}`;
   const cdText = getCountdownText(nearest);
+  const titleStr = nearest.title ? ` (${nearest.title})` : '';
 
   DOM.upcomingBanner.className = "upcoming-banner has-alarm";
-  DOM.upcomingAlarmText.textContent = `Keyingi budilnik: ${timeStr} da (${cdText})`;
+  DOM.upcomingAlarmText.textContent = `Keyingi qo'ng'iroq: ${timeStr}${titleStr} - ${cdText}`;
 }
 
 /* ==========================================================
@@ -778,12 +861,16 @@ function setupEventListeners() {
   // Global AudioContext unlocker on first click or touch
   const unlockAudio = () => {
     soundEngine.init();
-    DOM.audioUnlockBanner.style.display = 'none';
+    if (DOM.audioUnlockBanner) {
+      DOM.audioUnlockBanner.style.display = 'none';
+    }
   };
   window.addEventListener('click', unlockAudio, { once: true });
   window.addEventListener('keydown', unlockAudio, { once: true });
 
-  DOM.unlockAudioBtn.addEventListener('click', unlockAudio);
+  if (DOM.unlockAudioBtn) {
+    DOM.unlockAudioBtn.addEventListener('click', unlockAudio);
+  }
 
   // Tab Switching
   DOM.navTabs.forEach(tab => {
@@ -793,28 +880,36 @@ function setupEventListeners() {
 
       tab.classList.add('active');
       const targetId = tab.dataset.tab;
-      document.getElementById(targetId).classList.add('active');
+      const targetContent = document.getElementById(targetId);
+      if (targetContent) targetContent.classList.add('active');
     });
   });
 
   // 12/24 Hour format toggle
-  DOM.formatToggleBtn.addEventListener('click', () => {
-    STATE.is24Hour = !STATE.is24Hour;
-    DOM.formatLabel.textContent = STATE.is24Hour ? "24H" : "12H";
-    updateLiveClock();
-    renderAlarmsList();
-  });
+  if (DOM.formatToggleBtn) {
+    DOM.formatToggleBtn.addEventListener('click', () => {
+      STATE.is24Hour = !STATE.is24Hour;
+      if (DOM.formatLabel) {
+        DOM.formatLabel.textContent = STATE.is24Hour ? "24H" : "12H";
+      }
+      updateLiveClock();
+      renderAlarmsList();
+    });
+  }
 
-  // Quick sound tester in header
-  DOM.soundTestQuickBtn.addEventListener('click', () => {
-    soundEngine.init();
-    soundEngine.previewSound('classic');
-  });
+  // Quick school bell sound tester in header
+  if (DOM.soundTestQuickBtn) {
+    DOM.soundTestQuickBtn.addEventListener('click', () => {
+      soundEngine.init();
+      soundEngine.previewSound('qongiroq');
+    });
+  }
 
   // Form Stepper buttons
   document.querySelectorAll('.step-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const targetInput = document.getElementById(btn.dataset.step);
+      if (!targetInput) return;
       const isUp = btn.dataset.dir === 'up';
       let val = parseInt(targetInput.value || 0, 10);
       const max = parseInt(targetInput.max, 10);
@@ -831,6 +926,7 @@ function setupEventListeners() {
 
   // Auto-pad and clamp on blur/change
   [DOM.alarmHour, DOM.alarmMinute, DOM.alarmSecond].forEach(input => {
+    if (!input) return;
     input.addEventListener('blur', () => {
       let val = parseInt(input.value || 0, 10);
       const max = parseInt(input.max, 10);
@@ -841,11 +937,22 @@ function setupEventListeners() {
     });
   });
 
-  // Quick preset pills (+1m, +5m, +15m, +30m, +1h)
-  DOM.presetChips.forEach(chip => {
+  // Quick preset pills (Schedule times or offsets)
+  document.querySelectorAll('.preset-chip[data-time], .preset-chip[data-offset]').forEach(chip => {
     chip.addEventListener('click', () => {
-      const offset = parseInt(chip.dataset.offset, 10);
-      setDefaultFormTime(offset);
+      if (chip.dataset.time) {
+        const parts = chip.dataset.time.split(':');
+        if (DOM.alarmHour) DOM.alarmHour.value = parts[0];
+        if (DOM.alarmMinute) DOM.alarmMinute.value = parts[1];
+        if (DOM.alarmSecond) DOM.alarmSecond.value = "00";
+      } else if (chip.dataset.offset) {
+        const offset = parseInt(chip.dataset.offset, 10);
+        setDefaultFormTime(offset);
+      }
+
+      if (chip.dataset.title && DOM.alarmTitle) {
+        DOM.alarmTitle.value = chip.dataset.title;
+      }
 
       // Flash feedback
       chip.style.transform = 'scale(0.95)';
@@ -853,116 +960,173 @@ function setupEventListeners() {
     });
   });
 
+  // Quick lesson title chips
+  document.querySelectorAll('.title-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (DOM.alarmTitle) {
+        DOM.alarmTitle.value = chip.dataset.title || '';
+        DOM.alarmTitle.focus();
+      }
+      chip.style.transform = 'scale(0.95)';
+      setTimeout(() => { chip.style.transform = ''; }, 150);
+    });
+  });
+
+  // Standard school schedule loader button
+  if (DOM.loadStandardScheduleBtn) {
+    DOM.loadStandardScheduleBtn.addEventListener('click', loadStandardSchoolSchedule);
+  }
+
   // Preview / Test Sound Button
   let isTesting = false;
-  DOM.testSoundBtn.addEventListener('click', () => {
-    soundEngine.init();
-    const selectedSound = DOM.alarmSound.value;
+  if (DOM.testSoundBtn) {
+    DOM.testSoundBtn.addEventListener('click', () => {
+      soundEngine.init();
+      const selectedSound = DOM.alarmSound ? DOM.alarmSound.value : 'qongiroq';
 
-    if (!isTesting) {
-      isTesting = true;
-      DOM.testIcon.textContent = "⏹️";
-      DOM.testSoundBtn.innerHTML = `<span>⏹️</span> To'xtatish`;
+      if (!isTesting) {
+        isTesting = true;
+        if (DOM.testIcon) DOM.testIcon.textContent = "⏹️";
+        DOM.testSoundBtn.innerHTML = `<span>⏹️</span> To'xtatish`;
 
-      soundEngine.previewSound(selectedSound, () => {
+        soundEngine.previewSound(selectedSound, () => {
+          isTesting = false;
+          DOM.testSoundBtn.innerHTML = `<span>▶️</span> Sinab ko'rish`;
+        });
+      } else {
         isTesting = false;
+        soundEngine.stopAll();
         DOM.testSoundBtn.innerHTML = `<span>▶️</span> Sinab ko'rish`;
-      });
-    } else {
-      isTesting = false;
-      soundEngine.stopAll();
-      DOM.testSoundBtn.innerHTML = `<span>▶️</span> Sinab ko'rish`;
-    }
-  });
-
-  // Submit New Alarm
-  DOM.alarmForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    soundEngine.init();
-
-    let h = parseInt(DOM.alarmHour.value || 0, 10);
-    let m = parseInt(DOM.alarmMinute.value || 0, 10);
-    let s = parseInt(DOM.alarmSecond.value || 0, 10);
-
-    // Validate boundaries
-    if (isNaN(h) || h < 0 || h > 23) h = 0;
-    if (isNaN(m) || m < 0 || m > 59) m = 0;
-    if (isNaN(s) || s < 0 || s > 59) s = 0;
-
-    const title = DOM.alarmTitle.value.trim() || "Budilnik";
-    const sound = DOM.alarmSound.value || "classic";
-    const snoozeRadio = document.querySelector('input[name="snoozeTime"]:checked');
-    const snoozeMinutes = snoozeRadio ? parseInt(snoozeRadio.value, 10) : 5;
-
-    // Enforce maximum 15 seconds duration
-    const durationRadio = document.querySelector('input[name="ringDuration"]:checked');
-    const ringDuration = durationRadio ? Math.min(Math.max(parseInt(durationRadio.value, 10) || 15, 1), 15) : 15;
-
-    const newAlarm = {
-      id: 'alarm_' + Date.now(),
-      hour: String(h).padStart(2, '0'),
-      minute: String(m).padStart(2, '0'),
-      second: String(s).padStart(2, '0'),
-      title: title,
-      sound: sound,
-      snoozeMinutes: snoozeMinutes,
-      durationSeconds: ringDuration,
-      enabled: true,
-      createdAt: Date.now()
-    };
-
-    STATE.alarms.push(newAlarm);
-    saveAlarms();
-
-    // Show temporary toast or feedback
-    const btn = document.getElementById('saveAlarmBtn');
-    const oldText = btn.innerHTML;
-    btn.innerHTML = `<span>✅</span> Saqlandi!`;
-    btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-
-    setTimeout(() => {
-      btn.innerHTML = oldText;
-      btn.style.background = '';
-    }, 1500);
-
-    // Reset title
-    DOM.alarmTitle.value = '';
-  });
-
-  // Alarm list delegation (Toggle & Delete)
-  DOM.alarmsList.addEventListener('click', (e) => {
-    // Delete button
-    const delBtn = e.target.closest('.btn-delete-alarm');
-    if (delBtn) {
-      const id = delBtn.dataset.id;
-      STATE.alarms = STATE.alarms.filter(a => a.id !== id);
-      saveAlarms();
-      return;
-    }
-
-    // Toggle switch
-    const toggle = e.target.closest('.alarm-toggle');
-    if (toggle) {
-      const id = toggle.dataset.id;
-      const alarm = STATE.alarms.find(a => a.id === id);
-      if (alarm) {
-        alarm.enabled = toggle.checked;
-        saveAlarms();
       }
-    }
-  });
+    });
+  }
 
-  // Clear all alarms
-  DOM.clearAllAlarmsBtn.addEventListener('click', () => {
-    if (confirm("Haqiqatan ham barcha budilniklarni o'chirmoqchimisiz?")) {
-      STATE.alarms = [];
-      saveAlarms();
-    }
-  });
+  // ==========================================================
+  // SUBMIT NEW BELL - ROBUST & BUG-FREE (CANNOT GET STUCK)
+  // ==========================================================
+  const DEFAULT_SAVE_BTN_HTML = `<span class="btn-icon-inside">🔔</span> Qo'ng'iroqni o'rnatish`;
+  let saveBtnTimeoutId = null;
+
+  if (DOM.alarmForm) {
+    DOM.alarmForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      soundEngine.init();
+
+      const btn = document.getElementById('saveAlarmBtn');
+      if (saveBtnTimeoutId) {
+        clearTimeout(saveBtnTimeoutId);
+        saveBtnTimeoutId = null;
+      }
+
+      try {
+        let h = parseInt(DOM.alarmHour.value || 0, 10);
+        let m = parseInt(DOM.alarmMinute.value || 0, 10);
+        let s = parseInt(DOM.alarmSecond.value || 0, 10);
+
+        // Validate boundaries
+        if (isNaN(h) || h < 0 || h > 23) h = 0;
+        if (isNaN(m) || m < 0 || m > 59) m = 0;
+        if (isNaN(s) || s < 0 || s > 59) s = 0;
+
+        const title = DOM.alarmTitle.value.trim() || "Dars qo'ng'irog'i";
+        const sound = DOM.alarmSound.value || "qongiroq";
+        const snoozeRadio = document.querySelector('input[name="snoozeTime"]:checked');
+        const snoozeMinutes = snoozeRadio ? parseInt(snoozeRadio.value, 10) : 5;
+
+        // Enforce maximum 15 seconds duration
+        const durationRadio = document.querySelector('input[name="ringDuration"]:checked');
+        const ringDuration = durationRadio ? Math.min(Math.max(parseInt(durationRadio.value, 10) || 15, 1), 15) : 15;
+
+        const newAlarm = {
+          id: 'bell_' + Date.now(),
+          hour: String(h).padStart(2, '0'),
+          minute: String(m).padStart(2, '0'),
+          second: String(s).padStart(2, '0'),
+          title: title,
+          sound: sound,
+          snoozeMinutes: snoozeMinutes,
+          durationSeconds: ringDuration,
+          enabled: true,
+          createdAt: Date.now()
+        };
+
+        STATE.alarms.push(newAlarm);
+        saveAlarms();
+
+        // Reset title input
+        DOM.alarmTitle.value = '';
+
+        // Safe visual feedback on button: disable to prevent spam, reliably restore
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = `<span>✅</span> Muvaffaqiyatli saqlandi!`;
+          btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+
+          saveBtnTimeoutId = setTimeout(() => {
+            btn.innerHTML = DEFAULT_SAVE_BTN_HTML;
+            btn.style.background = '';
+            btn.disabled = false;
+            saveBtnTimeoutId = null;
+          }, 1200);
+        }
+
+        showToast("🔔 Qo'ng'iroq muvaffaqiyatli saqlandi!", "success");
+      } catch (err) {
+        console.error("Qo'ng'iroqni saqlashda xatolik:", err);
+        if (btn) {
+          btn.innerHTML = DEFAULT_SAVE_BTN_HTML;
+          btn.style.background = '';
+          btn.disabled = false;
+        }
+        showToast("Xatolik yuz berdi!", "warning");
+      }
+    });
+  }
+
+  // Bell list delegation (Toggle & Delete)
+  if (DOM.alarmsList) {
+    DOM.alarmsList.addEventListener('click', (e) => {
+      // Delete button
+      const delBtn = e.target.closest('.btn-delete-alarm');
+      if (delBtn) {
+        const id = delBtn.dataset.id;
+        STATE.alarms = STATE.alarms.filter(a => a.id !== id);
+        saveAlarms();
+        showToast("Qo'ng'iroq o'chirildi", "info");
+        return;
+      }
+
+      // Toggle switch
+      const toggle = e.target.closest('.alarm-toggle');
+      if (toggle) {
+        const id = toggle.dataset.id;
+        const alarm = STATE.alarms.find(a => a.id === id);
+        if (alarm) {
+          alarm.enabled = toggle.checked;
+          saveAlarms();
+        }
+      }
+    });
+  }
+
+  // Clear all bells
+  if (DOM.clearAllAlarmsBtn) {
+    DOM.clearAllAlarmsBtn.addEventListener('click', () => {
+      if (confirm("Haqiqatan ham barcha qo'ng'iroqlarni o'chirmoqchimisiz?")) {
+        STATE.alarms = [];
+        saveAlarms();
+        showToast("Barcha qo'ng'iroqlar tozalandi", "info");
+      }
+    });
+  }
 
   // Ringing Modal Actions
-  DOM.stopAlarmBtn.addEventListener('click', () => stopRingingAlarm(false));
-  DOM.snoozeAlarmBtn.addEventListener('click', snoozeRingingAlarm);
+  if (DOM.stopAlarmBtn) {
+    DOM.stopAlarmBtn.addEventListener('click', () => stopRingingAlarm(false));
+  }
+  if (DOM.snoozeAlarmBtn) {
+    DOM.snoozeAlarmBtn.addEventListener('click', snoozeRingingAlarm);
+  }
 
   // Setup Timer Tab
   setupTimer();
@@ -972,7 +1136,7 @@ function setupEventListeners() {
 }
 
 /* ==========================================================
-   TAB 2: COUNTDOWN TIMER
+   TAB 2: DARS VA TANAFFUS TAYMERI
    ========================================================== */
 function setupTimer() {
   function updateTimerDisplay() {
@@ -980,7 +1144,9 @@ function setupTimer() {
     const h = String(Math.floor(total / 3600)).padStart(2, '0');
     const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
     const s = String(total % 60).padStart(2, '0');
-    DOM.timerDisplay.textContent = `${h}:${m}:${s}`;
+    if (DOM.timerDisplay) {
+      DOM.timerDisplay.textContent = `${h}:${m}:${s}`;
+    }
   }
 
   function startTimer() {
@@ -998,9 +1164,9 @@ function setupTimer() {
       if (STATE.timer.remainingSeconds <= 0) return;
 
       STATE.timer.isRunning = true;
-      DOM.timerStartBtn.style.display = 'none';
-      DOM.timerPauseBtn.style.display = 'inline-flex';
-      DOM.timerInputsWrap.style.display = 'none';
+      if (DOM.timerStartBtn) DOM.timerStartBtn.style.display = 'none';
+      if (DOM.timerPauseBtn) DOM.timerPauseBtn.style.display = 'inline-flex';
+      if (DOM.timerInputsWrap) DOM.timerInputsWrap.style.display = 'none';
 
       STATE.timer.intervalId = setInterval(() => {
         if (STATE.timer.remainingSeconds > 0) {
@@ -1010,16 +1176,16 @@ function setupTimer() {
           // Timer finished!
           clearInterval(STATE.timer.intervalId);
           STATE.timer.isRunning = false;
-          DOM.timerStartBtn.style.display = 'inline-flex';
-          DOM.timerPauseBtn.style.display = 'none';
-          DOM.timerInputsWrap.style.display = 'flex';
+          if (DOM.timerStartBtn) DOM.timerStartBtn.style.display = 'inline-flex';
+          if (DOM.timerPauseBtn) DOM.timerPauseBtn.style.display = 'none';
+          if (DOM.timerInputsWrap) DOM.timerInputsWrap.style.display = 'flex';
 
           triggerAlarm({
-            id: 'timer_alarm',
+            id: 'timer_bell',
             hour: new Date().getHours(),
             minute: new Date().getMinutes(),
-            title: "Taymer vaqti tugadi!",
-            sound: "siren",
+            title: "Taymer vaqti tugadi! Dars yoki tanaffus yakunlandi",
+            sound: "qongiroq",
             snoozeMinutes: 5,
             durationSeconds: 15
           });
@@ -1032,25 +1198,25 @@ function setupTimer() {
     if (STATE.timer.isRunning) {
       clearInterval(STATE.timer.intervalId);
       STATE.timer.isRunning = false;
-      DOM.timerStartBtn.style.display = 'inline-flex';
-      DOM.timerPauseBtn.style.display = 'none';
+      if (DOM.timerStartBtn) DOM.timerStartBtn.style.display = 'inline-flex';
+      if (DOM.timerPauseBtn) DOM.timerPauseBtn.style.display = 'none';
     }
   }
 
   function resetTimer() {
     pauseTimer();
-    const h = parseInt(DOM.timerH.value || 0, 10);
-    const m = parseInt(DOM.timerM.value || 0, 10);
-    const s = parseInt(DOM.timerS.value || 0, 10);
+    const h = parseInt(DOM.timerH ? DOM.timerH.value : 0, 10);
+    const m = parseInt(DOM.timerM ? DOM.timerM.value : 45, 10);
+    const s = parseInt(DOM.timerS ? DOM.timerS.value : 0, 10);
     STATE.timer.totalSeconds = h * 3600 + m * 60 + s;
     STATE.timer.remainingSeconds = STATE.timer.totalSeconds;
-    DOM.timerInputsWrap.style.display = 'flex';
+    if (DOM.timerInputsWrap) DOM.timerInputsWrap.style.display = 'flex';
     updateTimerDisplay();
   }
 
-  DOM.timerStartBtn.addEventListener('click', startTimer);
-  DOM.timerPauseBtn.addEventListener('click', pauseTimer);
-  DOM.timerResetBtn.addEventListener('click', resetTimer);
+  if (DOM.timerStartBtn) DOM.timerStartBtn.addEventListener('click', startTimer);
+  if (DOM.timerPauseBtn) DOM.timerPauseBtn.addEventListener('click', pauseTimer);
+  if (DOM.timerResetBtn) DOM.timerResetBtn.addEventListener('click', resetTimer);
 
   DOM.timerPresetBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1060,9 +1226,9 @@ function setupTimer() {
       const m = Math.floor((sec % 3600) / 60);
       const s = sec % 60;
 
-      DOM.timerH.value = String(h).padStart(2, '0');
-      DOM.timerM.value = String(m).padStart(2, '0');
-      DOM.timerS.value = String(s).padStart(2, '0');
+      if (DOM.timerH) DOM.timerH.value = String(h).padStart(2, '0');
+      if (DOM.timerM) DOM.timerM.value = String(m).padStart(2, '0');
+      if (DOM.timerS) DOM.timerS.value = String(s).padStart(2, '0');
 
       STATE.timer.totalSeconds = sec;
       STATE.timer.remainingSeconds = sec;
@@ -1072,6 +1238,7 @@ function setupTimer() {
 
   // Handle manual input changes
   [DOM.timerH, DOM.timerM, DOM.timerS].forEach(input => {
+    if (!input) return;
     input.addEventListener('change', () => {
       if (!STATE.timer.isRunning) {
         resetTimer();
@@ -1083,7 +1250,7 @@ function setupTimer() {
 }
 
 /* ==========================================================
-   TAB 3: STOPWATCH
+   TAB 3: MAKTAB SEKUNDOMERI
    ========================================================== */
 function setupStopwatch() {
   function formatStopwatch(ms) {
@@ -1097,18 +1264,22 @@ function setupStopwatch() {
   }
 
   function renderStopwatch() {
-    DOM.stopwatchDisplay.innerHTML = formatStopwatch(STATE.stopwatch.elapsedTime);
+    if (DOM.stopwatchDisplay) {
+      DOM.stopwatchDisplay.innerHTML = formatStopwatch(STATE.stopwatch.elapsedTime);
+    }
   }
 
   function startStopwatch() {
     if (!STATE.stopwatch.isRunning) {
       STATE.stopwatch.isRunning = true;
       STATE.stopwatch.startTime = performance.now() - STATE.stopwatch.elapsedTime;
-      DOM.swStartBtn.textContent = "⏸️ To'xtatish";
-      DOM.swStartBtn.classList.remove('btn-primary');
-      DOM.swStartBtn.classList.add('btn-secondary');
-      DOM.swLapBtn.disabled = false;
-      DOM.swResetBtn.disabled = false;
+      if (DOM.swStartBtn) {
+        DOM.swStartBtn.textContent = "⏸️ To'xtatish";
+        DOM.swStartBtn.classList.remove('btn-primary');
+        DOM.swStartBtn.classList.add('btn-secondary');
+      }
+      if (DOM.swLapBtn) DOM.swLapBtn.disabled = false;
+      if (DOM.swResetBtn) DOM.swResetBtn.disabled = false;
 
       STATE.stopwatch.intervalId = setInterval(() => {
         STATE.stopwatch.elapsedTime = performance.now() - STATE.stopwatch.startTime;
@@ -1118,9 +1289,11 @@ function setupStopwatch() {
       // Pause
       clearInterval(STATE.stopwatch.intervalId);
       STATE.stopwatch.isRunning = false;
-      DOM.swStartBtn.textContent = "▶️ Davom ettirish";
-      DOM.swStartBtn.classList.add('btn-primary');
-      DOM.swStartBtn.classList.remove('btn-secondary');
+      if (DOM.swStartBtn) {
+        DOM.swStartBtn.textContent = "▶️ Davom ettirish";
+        DOM.swStartBtn.classList.add('btn-primary');
+        DOM.swStartBtn.classList.remove('btn-secondary');
+      }
     }
   }
 
@@ -1129,13 +1302,15 @@ function setupStopwatch() {
     STATE.stopwatch.isRunning = false;
     STATE.stopwatch.elapsedTime = 0;
     STATE.stopwatch.laps = [];
-    DOM.swStartBtn.textContent = "▶️ Boshlash";
-    DOM.swStartBtn.classList.add('btn-primary');
-    DOM.swStartBtn.classList.remove('btn-secondary');
-    DOM.swLapBtn.disabled = true;
-    DOM.swResetBtn.disabled = true;
-    DOM.lapsContainer.style.display = 'none';
-    DOM.lapsList.innerHTML = '';
+    if (DOM.swStartBtn) {
+      DOM.swStartBtn.textContent = "▶️ Boshlash";
+      DOM.swStartBtn.classList.add('btn-primary');
+      DOM.swStartBtn.classList.remove('btn-secondary');
+    }
+    if (DOM.swLapBtn) DOM.swLapBtn.disabled = true;
+    if (DOM.swResetBtn) DOM.swResetBtn.disabled = true;
+    if (DOM.lapsContainer) DOM.lapsContainer.style.display = 'none';
+    if (DOM.lapsList) DOM.lapsList.innerHTML = '';
     renderStopwatch();
   }
 
@@ -1145,15 +1320,15 @@ function setupStopwatch() {
     const lapNum = STATE.stopwatch.laps.length + 1;
     STATE.stopwatch.laps.push(currentMs);
 
-    DOM.lapsContainer.style.display = 'block';
+    if (DOM.lapsContainer) DOM.lapsContainer.style.display = 'block';
     const li = document.createElement('li');
     li.innerHTML = `<span>#${lapNum} Davra</span> <span>${formatStopwatch(currentMs).replace(/<\/?span[^>]*>/g, '')}</span>`;
-    DOM.lapsList.prepend(li);
+    if (DOM.lapsList) DOM.lapsList.prepend(li);
   }
 
-  DOM.swStartBtn.addEventListener('click', startStopwatch);
-  DOM.swResetBtn.addEventListener('click', resetStopwatch);
-  DOM.swLapBtn.addEventListener('click', recordLap);
+  if (DOM.swStartBtn) DOM.swStartBtn.addEventListener('click', startStopwatch);
+  if (DOM.swResetBtn) DOM.swResetBtn.addEventListener('click', resetStopwatch);
+  if (DOM.swLapBtn) DOM.swLapBtn.addEventListener('click', recordLap);
 }
 
 // Utility: HTML escape
@@ -1179,7 +1354,7 @@ function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span>⏱️</span> <span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<span>🔔</span> <span>${escapeHtml(message)}</span>`;
   container.appendChild(toast);
 
   setTimeout(() => {
