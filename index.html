@@ -95,10 +95,10 @@
                 <span class="break-current-badge" id="currentBreakBadge">10 daqiqa</span>
               </div>
               <div class="break-toggle-group" role="group" aria-label="Katta tanaffus davomiyligi">
-                <button type="button" class="btn-break-opt active" data-break="10" id="break10Btn" title="3-darsdan keyin 10 daqiqa katta tanaffus">
+                <button type="button" class="btn-break-opt active" data-break="10" id="break10Btn" onclick="handleBreakToggle(10)" title="3-darsdan keyin 10 daqiqa katta tanaffus">
                   ⏳ 10 daqiqa (Standart)
                 </button>
-                <button type="button" class="btn-break-opt" data-break="5" id="break5Btn" title="Katta tanaffusni 5 daqiqaga qisqartirish">
+                <button type="button" class="btn-break-opt" data-break="5" id="break5Btn" onclick="handleBreakToggle(5)" title="Katta tanaffusni 5 daqiqaga qisqartirish">
                   ⚡ 5 daqiqa (Qisqartirilgan)
                 </button>
               </div>
@@ -417,6 +417,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.4"></script>
 </body>
 </html>

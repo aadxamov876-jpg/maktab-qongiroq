@@ -1627,6 +1627,10 @@ input:checked + .slider:before {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  position: relative;
+  z-index: 5;
+  pointer-events: auto;
+  user-select: none;
   transition: all var(--transition-fast);
   display: flex;
   align-items: center;

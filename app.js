@@ -506,53 +506,72 @@ function initApp() {
  * @param {number} duration - 10 yoki 5 daqiqa
  */
 function setBigBreakDuration(duration) {
+  duration = parseInt(duration, 10) || 10;
   STATE.bigBreakDuration = duration;
   try {
     localStorage.setItem('smart_qongiroq_big_break', String(duration));
   } catch (e) {}
 
   // Update UI toggle buttons
-  if (DOM.break10Btn && DOM.break5Btn) {
-    DOM.break10Btn.classList.toggle('active', duration === 10);
-    DOM.break5Btn.classList.toggle('active', duration === 5);
-  }
+  const b10 = DOM.break10Btn || document.getElementById('break10Btn');
+  const b5 = DOM.break5Btn || document.getElementById('break5Btn');
+  if (b10) b10.classList.toggle('active', duration === 10);
+  if (b5) b5.classList.toggle('active', duration === 5);
 
   // Update badge
-  if (DOM.currentBreakBadge) {
-    DOM.currentBreakBadge.textContent = `${duration} daqiqa`;
+  const badge = DOM.currentBreakBadge || document.getElementById('currentBreakBadge');
+  if (badge) {
+    badge.textContent = `${duration} daqiqa`;
   }
 
   // Update live explanatory hint
-  if (DOM.breakTimeHint) {
+  const hint = DOM.breakTimeHint || document.getElementById('breakTimeHint');
+  if (hint) {
     if (duration === 5) {
-      DOM.breakTimeHint.innerHTML = `📌 <b>Qisqartirilgan:</b> 3-dars (10:25) ➔ 5 daq tanaffus ➔ 4-dars (10:30) ➔ 11:15 tugashi ➔ 11:20 5-dars ➔ 6-dars yakuni: <b>12:55</b>`;
+      hint.innerHTML = `📌 <b>Qisqartirilgan:</b> 3-dars (10:25) ➔ 5 daq tanaffus ➔ 4-dars (10:30) ➔ 11:15 tugashi ➔ 11:20 5-dars ➔ 6-dars yakuni: <b>12:55</b>`;
     } else {
-      DOM.breakTimeHint.innerHTML = `📌 <b>Standart:</b> 3-dars (10:25) ➔ 10 daq tanaffus ➔ 4-dars (10:35) ➔ 11:20 tugashi ➔ 11:25 5-dars ➔ 6-dars yakuni: <b>13:00</b>`;
+      hint.innerHTML = `📌 <b>Standart:</b> 3-dars (10:25) ➔ 10 daq tanaffus ➔ 4-dars (10:35) ➔ 11:20 tugashi ➔ 11:25 5-dars ➔ 6-dars yakuni: <b>13:00</b>`;
     }
   }
 
   // Update Preset Chips on the left
-  if (DOM.presetChipL4) {
+  const pL4 = DOM.presetChipL4 || document.getElementById('presetChipL4');
+  const pB4 = DOM.presetChipB4 || document.getElementById('presetChipB4');
+  const pL5 = DOM.presetChipL5 || document.getElementById('presetChipL5');
+  const pEnd = DOM.presetChipEnd || document.getElementById('presetChipEnd');
+
+  if (pL4) {
     const timeL4 = duration === 5 ? "10:30" : "10:35";
-    DOM.presetChipL4.dataset.time = timeL4;
-    DOM.presetChipL4.textContent = `${timeL4} (4-dars)`;
+    pL4.dataset.time = timeL4;
+    pL4.textContent = `${timeL4} (4-dars)`;
   }
-  if (DOM.presetChipB4) {
+  if (pB4) {
     const timeB4 = duration === 5 ? "11:15" : "11:20";
-    DOM.presetChipB4.dataset.time = timeB4;
-    DOM.presetChipB4.textContent = `${timeB4} (4-tanaffus)`;
+    pB4.dataset.time = timeB4;
+    pB4.textContent = `${timeB4} (4-tanaffus)`;
   }
-  if (DOM.presetChipL5) {
+  if (pL5) {
     const timeL5 = duration === 5 ? "11:20" : "11:25";
-    DOM.presetChipL5.dataset.time = timeL5;
-    DOM.presetChipL5.textContent = `${timeL5} (5-dars)`;
+    pL5.dataset.time = timeL5;
+    pL5.textContent = `${timeL5} (5-dars)`;
   }
-  if (DOM.presetChipEnd) {
+  if (pEnd) {
     const timeEnd = duration === 5 ? "12:55" : "13:00";
-    DOM.presetChipEnd.dataset.time = timeEnd;
-    DOM.presetChipEnd.textContent = `${timeEnd} (Dars yakuni)`;
+    pEnd.dataset.time = timeEnd;
+    pEnd.textContent = `${timeEnd} (Dars yakuni)`;
   }
 }
+
+// Global click handler for break toggle buttons (accessible via inline onclick and JS)
+window.handleBreakToggle = function(duration) {
+  duration = parseInt(duration, 10) || 10;
+  setBigBreakDuration(duration);
+  if (duration === 5) {
+    showToast("⚡ Katta tanaffus 5 daqiqa (qisqartirilgan) qilib belgilandi: 10:30 da 4-dars!", "info");
+  } else {
+    showToast("🥪 Katta tanaffus 10 daqiqa (standart) qilib belgilandi", "info");
+  }
+};
 
 // Set initial input time offset (e.g. current time + 5 min)
 function setDefaultFormTime(minutesOffset = 5) {
@@ -1145,18 +1164,29 @@ function setupEventListeners() {
   });
 
   // Big break duration toggle buttons (10 daqiqa yoki 5 daqiqa qisqartirish)
-  if (DOM.break10Btn) {
-    DOM.break10Btn.addEventListener('click', () => {
-      setBigBreakDuration(10);
-      showToast("🥪 Katta tanaffus 10 daqiqa (standart) qilib belgilandi", "info");
+  const b10 = DOM.break10Btn || document.getElementById('break10Btn');
+  const b5 = DOM.break5Btn || document.getElementById('break5Btn');
+  if (b10) {
+    b10.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.handleBreakToggle(10);
     });
   }
-  if (DOM.break5Btn) {
-    DOM.break5Btn.addEventListener('click', () => {
-      setBigBreakDuration(5);
-      showToast("⚡ Katta tanaffus 5 daqiqa (qisqartirilgan) qilib belgilandi: 10:30 da 4-dars!", "info");
+  if (b5) {
+    b5.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.handleBreakToggle(5);
     });
   }
+
+  // Delegated fallback for break toggle
+  document.addEventListener('click', (e) => {
+    const opt = e.target.closest('.btn-break-opt');
+    if (opt && opt.dataset && opt.dataset.break) {
+      e.preventDefault();
+      window.handleBreakToggle(parseInt(opt.dataset.break, 10));
+    }
+  });
 
   // Standard school schedule loader button
   if (DOM.loadStandardScheduleBtn) {
