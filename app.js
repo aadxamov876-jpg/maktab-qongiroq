@@ -16,6 +16,7 @@
 // State Management
 const STATE = {
   is24Hour: true,
+  bigBreakDuration: parseInt(localStorage.getItem('smart_qongiroq_big_break') || '10', 10),
   alarms: [],
   activeRingingAlarm: null,
   ringingIntervalId: null,
@@ -49,21 +50,129 @@ const UZ_DAYS = [
   "Payshanba", "Juma", "Shanba"
 ];
 
+/**
+ * ==========================================================
+ * TANAFFUS (PERERYV) VA DARS JADVALI LOGIKASI
+ * ==========================================================
+ * Qoidalar:
+ * - Oddiy tanaffus (qisqa: 5 daq) faqat darslar orasida bo'ladi (1->2, 2->3, 4->5, 5->6).
+ * - Katta tanaffus (uzun: 15 daq) FAQAT 3-darsdan keyin bo'ladi.
+ * - Oxirgi darsdan keyin tanaffus bo'lmaydi (0 daq), darslar yakunlanadi.
+ */
+
+/**
+ * Dars raqamiga qarab tanaffus davomiyligini hisoblovchi funksiya
+ * @param {number} lessonNumber - Dars raqami (1, 2, 3...)
+ * @param {number} totalLessons - Jami darslar soni (standart: 6)
+ * @param {number} [customLongBreak] - Katta tanaffus davomiyligi (10 yoki 5 daqiqa)
+ * @returns {number} Tanaffus davomiyligi daqiqalarda
+ */
+function getBreakDuration(lessonNumber, totalLessons = 6, customLongBreak = null) {
+  // Oxirgi darsdan keyin tanaffus bo'lmaydi
+  if (lessonNumber >= totalLessons) {
+    return 0;
+  }
+  // Katta tanaffus FAQAT 3-darsdan keyin bo'ladi (10 daqiqa yoki 5 daqiqaga kichraytirilgan)
+  if (lessonNumber === 3) {
+    if (customLongBreak !== null && customLongBreak !== undefined) {
+      return customLongBreak;
+    }
+    return (STATE && STATE.bigBreakDuration) ? STATE.bigBreakDuration : 10;
+  }
+  // Oddiy tanaffus (qisqa) faqat darslar orasida: 5 daqiqa
+  return 5;
+}
+
+/**
+ * Maktab dars jadvali va qo'ng'iroqlari vaqtlarini qoidaga mos hisoblovchi funksiya
+ * @param {Object} options
+ * @param {number} [options.startHour=8] - Boshlanish soati
+ * @param {number} [options.startMinute=0] - Boshlanish daqiqasi
+ * @param {number} [options.totalLessons=6] - Jami darslar soni
+ * @param {number} [options.lessonDuration=45] - Dars davomiyligi (daqiqa)
+ * @param {number} [options.longBreakDuration] - Katta tanaffus (10 yoki 5 daqiqa)
+ * @returns {Array<{hour: string, minute: string, second: string, title: string}>}
+ */
+function calculateSchoolSchedule(options = {}) {
+  const {
+    startHour = 8,
+    startMinute = 0,
+    totalLessons = 6,
+    lessonDuration = 45,
+    longBreakDuration = (STATE && STATE.bigBreakDuration) ? STATE.bigBreakDuration : 10
+  } = options;
+
+  const schedule = [];
+  let currentTotalMinutes = startHour * 60 + startMinute;
+
+  const formatTime = (totalMin) => {
+    const h = Math.floor(totalMin / 60) % 24;
+    const m = totalMin % 60;
+    return {
+      hour: String(h).padStart(2, '0'),
+      minute: String(m).padStart(2, '0'),
+      second: '00'
+    };
+  };
+
+  for (let lesson = 1; lesson <= totalLessons; lesson++) {
+    // Dars boshlanishi
+    const startTime = formatTime(currentTotalMinutes);
+    schedule.push({
+      hour: startTime.hour,
+      minute: startTime.minute,
+      second: startTime.second,
+      title: `${lesson}-Dars boshlanishi`
+    });
+
+    // Dars tugashi
+    currentTotalMinutes += lessonDuration;
+    const endTime = formatTime(currentTotalMinutes);
+
+    const breakDuration = getBreakDuration(lesson, totalLessons, longBreakDuration);
+
+    if (lesson === totalLessons) {
+      // Darslar yakuni (oxirgi darsdan keyin tanaffus qo'shilmaydi)
+      schedule.push({
+        hour: endTime.hour,
+        minute: endTime.minute,
+        second: endTime.second,
+        title: "Darslar yakuni (Katta qo'ng'iroq)"
+      });
+    } else if (lesson === 3) {
+      // FAQAT 3-darsdan keyin katta tanaffus
+      schedule.push({
+        hour: endTime.hour,
+        minute: endTime.minute,
+        second: endTime.second,
+        title: `Katta tanaffus (${breakDuration} daqiqa)`
+      });
+      currentTotalMinutes += breakDuration;
+    } else {
+      // Oddiy qisqa tanaffus
+      schedule.push({
+        hour: endTime.hour,
+        minute: endTime.minute,
+        second: endTime.second,
+        title: `${lesson}-Tanaffus (Dars tugashi)`
+      });
+      currentTotalMinutes += breakDuration;
+    }
+  }
+
+  return schedule;
+}
+
 // Standart 1-smena maktab dars jadvali
-const STANDARD_SCHOOL_SCHEDULE = [
-  { hour: "08", minute: "00", second: "00", title: "1-Dars boshlanishi" },
-  { hour: "08", minute: "45", second: "00", title: "1-Tanaffus (Dars tugashi)" },
-  { hour: "08", minute: "50", second: "00", title: "2-Dars boshlanishi" },
-  { hour: "09", minute: "35", second: "00", title: "Katta tanaffus (2-dars yakuni)" },
-  { hour: "09", minute: "50", second: "00", title: "3-Dars boshlanishi" },
-  { hour: "10", minute: "35", second: "00", title: "3-Tanaffus (Dars tugashi)" },
-  { hour: "10", minute: "45", second: "00", title: "4-Dars boshlanishi" },
-  { hour: "11", minute: "30", second: "00", title: "4-Tanaffus (Dars tugashi)" },
-  { hour: "11", minute: "40", second: "00", title: "5-Dars boshlanishi" },
-  { hour: "12", minute: "25", second: "00", title: "5-Tanaffus (Dars tugashi)" },
-  { hour: "12", minute: "35", second: "00", title: "6-Dars boshlanishi" },
-  { hour: "13", minute: "20", second: "00", title: "Darslar yakuni (Katta qo'ng'iroq)" }
-];
+function getStandardSchoolSchedule() {
+  return calculateSchoolSchedule({
+    startHour: 8,
+    startMinute: 0,
+    totalLessons: 6,
+    lessonDuration: 45,
+    longBreakDuration: (STATE && STATE.bigBreakDuration) ? STATE.bigBreakDuration : 10
+  });
+}
 
 /* ==========================================================
    WEB AUDIO API SOUND ENGINE
@@ -326,6 +435,14 @@ const DOM = {
   alarmCountSubtitle: document.getElementById('alarmCountSubtitle'),
   clearAllAlarmsBtn: document.getElementById('clearAllAlarmsBtn'),
   loadStandardScheduleBtn: document.getElementById('loadStandardScheduleBtn'),
+  break10Btn: document.getElementById('break10Btn'),
+  break5Btn: document.getElementById('break5Btn'),
+  currentBreakBadge: document.getElementById('currentBreakBadge'),
+  breakTimeHint: document.getElementById('breakTimeHint'),
+  presetChipL4: document.getElementById('presetChipL4'),
+  presetChipB4: document.getElementById('presetChipB4'),
+  presetChipL5: document.getElementById('presetChipL5'),
+  presetChipEnd: document.getElementById('presetChipEnd'),
 
   // Ringing Modal
   ringingModal: document.getElementById('ringingModal'),
@@ -372,12 +489,68 @@ function initApp() {
   updateLiveClock();
   setInterval(updateLiveClock, 500); // Check time & bells twice every second
 
+  // Set initial big break duration state & update UI
+  setBigBreakDuration(STATE.bigBreakDuration || 10);
+
   // Set default form time to +5 minutes from now
   setDefaultFormTime(5);
 
   // Request notification permission if available
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
+  }
+}
+
+/**
+ * Katta tanaffus davomiyligini (10 yoki 5 daqiqa) almashtirish funksiyasi
+ * @param {number} duration - 10 yoki 5 daqiqa
+ */
+function setBigBreakDuration(duration) {
+  STATE.bigBreakDuration = duration;
+  try {
+    localStorage.setItem('smart_qongiroq_big_break', String(duration));
+  } catch (e) {}
+
+  // Update UI toggle buttons
+  if (DOM.break10Btn && DOM.break5Btn) {
+    DOM.break10Btn.classList.toggle('active', duration === 10);
+    DOM.break5Btn.classList.toggle('active', duration === 5);
+  }
+
+  // Update badge
+  if (DOM.currentBreakBadge) {
+    DOM.currentBreakBadge.textContent = `${duration} daqiqa`;
+  }
+
+  // Update live explanatory hint
+  if (DOM.breakTimeHint) {
+    if (duration === 5) {
+      DOM.breakTimeHint.innerHTML = `📌 <b>Qisqartirilgan:</b> 3-dars (10:25) ➔ 5 daq tanaffus ➔ 4-dars (10:30) ➔ 11:15 tugashi ➔ 11:20 5-dars ➔ 6-dars yakuni: <b>12:55</b>`;
+    } else {
+      DOM.breakTimeHint.innerHTML = `📌 <b>Standart:</b> 3-dars (10:25) ➔ 10 daq tanaffus ➔ 4-dars (10:35) ➔ 11:20 tugashi ➔ 11:25 5-dars ➔ 6-dars yakuni: <b>13:00</b>`;
+    }
+  }
+
+  // Update Preset Chips on the left
+  if (DOM.presetChipL4) {
+    const timeL4 = duration === 5 ? "10:30" : "10:35";
+    DOM.presetChipL4.dataset.time = timeL4;
+    DOM.presetChipL4.textContent = `${timeL4} (4-dars)`;
+  }
+  if (DOM.presetChipB4) {
+    const timeB4 = duration === 5 ? "11:15" : "11:20";
+    DOM.presetChipB4.dataset.time = timeB4;
+    DOM.presetChipB4.textContent = `${timeB4} (4-tanaffus)`;
+  }
+  if (DOM.presetChipL5) {
+    const timeL5 = duration === 5 ? "11:20" : "11:25";
+    DOM.presetChipL5.dataset.time = timeL5;
+    DOM.presetChipL5.textContent = `${timeL5} (5-dars)`;
+  }
+  if (DOM.presetChipEnd) {
+    const timeEnd = duration === 5 ? "12:55" : "13:00";
+    DOM.presetChipEnd.dataset.time = timeEnd;
+    DOM.presetChipEnd.textContent = `${timeEnd} (Dars yakuni)`;
   }
 }
 
@@ -436,37 +609,36 @@ function saveAlarms() {
    STANDARD SCHOOL TIMETABLE LOADER
    ========================================================== */
 function loadStandardSchoolSchedule() {
+  const currentSchedule = getStandardSchoolSchedule();
+  const breakLabel = (STATE.bigBreakDuration === 5) ? "5 daqiqa (qisqartirilgan)" : "10 daqiqa (standart)";
+
   if (STATE.alarms.length > 0) {
-    const shouldAdd = confirm("Standart 1-smena dars jadvali (barcha 6 ta dars va tanaffus qo'ng'iroqlari) qo'shilsinmi?");
+    const shouldAdd = confirm(`1-smena dars jadvali (${breakLabel} katta tanaffus bilan) yuklansinmi?\n\nMavjud jadval yangilanadi.`);
     if (!shouldAdd) return;
+
+    // Avvalgi dars jadvali qo'ng'iroqlarini tozalab, to'liq yangisini joylash
+    STATE.alarms = STATE.alarms.filter(a => !a.id.startsWith('bell_std_'));
   }
 
   let addedCount = 0;
-  STANDARD_SCHOOL_SCHEDULE.forEach((item, index) => {
-    const exists = STATE.alarms.some(a => a.hour === item.hour && a.minute === item.minute);
-    if (!exists) {
-      STATE.alarms.push({
-        id: 'bell_std_' + Date.now() + '_' + index,
-        hour: item.hour,
-        minute: item.minute,
-        second: item.second,
-        title: item.title,
-        sound: 'qongiroq',
-        snoozeMinutes: 5,
-        durationSeconds: 15,
-        enabled: true,
-        createdAt: Date.now() + index
-      });
-      addedCount++;
-    }
+  currentSchedule.forEach((item, index) => {
+    STATE.alarms.push({
+      id: 'bell_std_' + Date.now() + '_' + index,
+      hour: item.hour,
+      minute: item.minute,
+      second: item.second,
+      title: item.title,
+      sound: 'qongiroq',
+      snoozeMinutes: 5,
+      durationSeconds: 15,
+      enabled: true,
+      createdAt: Date.now() + index
+    });
+    addedCount++;
   });
 
   saveAlarms();
-  if (addedCount > 0) {
-    showToast(`🏫 1-smena dars jadvali (${addedCount} ta qo'ng'iroq) yuklandi!`, "success");
-  } else {
-    showToast("Jadvaldagi qo'ng'iroqlar avvaldan mavjud", "info");
-  }
+  showToast(`🏫 Dars jadvali (${breakLabel} tanaffus, ${addedCount} ta qo'ng'iroq) yuklandi!`, "success");
 }
 
 /* ==========================================================
@@ -971,6 +1143,20 @@ function setupEventListeners() {
       setTimeout(() => { chip.style.transform = ''; }, 150);
     });
   });
+
+  // Big break duration toggle buttons (10 daqiqa yoki 5 daqiqa qisqartirish)
+  if (DOM.break10Btn) {
+    DOM.break10Btn.addEventListener('click', () => {
+      setBigBreakDuration(10);
+      showToast("🥪 Katta tanaffus 10 daqiqa (standart) qilib belgilandi", "info");
+    });
+  }
+  if (DOM.break5Btn) {
+    DOM.break5Btn.addEventListener('click', () => {
+      setBigBreakDuration(5);
+      showToast("⚡ Katta tanaffus 5 daqiqa (qisqartirilgan) qilib belgilandi: 10:30 da 4-dars!", "info");
+    });
+  }
 
   // Standard school schedule loader button
   if (DOM.loadStandardScheduleBtn) {
