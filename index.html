@@ -200,17 +200,19 @@
             <!-- Sound Selection & Volume -->
             <div class="form-row sound-row">
               <div class="sound-select-wrap">
-                <label for="alarmSound" class="form-label">Qo'ng'iroq ohangi:</label>
+                <label for="alarmSound" class="form-label">Qo'ng'iroq ohangi / Musiqa:</label>
                 <div class="select-container">
                   <select id="alarmSound">
-                    <option value="qongiroq" selected>🔔 Qongiroq (Maktabning haqiqiy qo'ng'irog'i MP3)</option>
-                    <option value="school">🏫 Maktab Qo'ng'irog'i (Elektr Zvonok)</option>
+                    <option value="barkamol" selected>🎵 Ozodbek Nazarbekov - Barkamol avlod (MP3)</option>
+                    <option value="qongiroq">🔔 Maktab Qo'ng'irog'i (Standart jarangdor MP3)</option>
+                    <option value="school">🏫 Maktab Elektr Qo'ng'irog'i (Zvonok)</option>
                     <option value="melodic">✨ Chiroyli Melodiya (Sehrli Arpeggio)</option>
                     <option value="siren">🚨 Tezkor Signal (Radar)</option>
                     <option value="gentle">🌅 Yumshoq Tong (Chime)</option>
                     <option value="classic">⏰ Klassik Budilnik (Raqamli Bi-Bi)</option>
                     <option value="retro">👾 8-Bit Retro Game</option>
                   </select>
+                  <audio id="barkamolAudio" src="barkamol_avlod.mp3" preload="auto"></audio>
                   <audio id="qongiroqAudio" src="qongiroq.mp3" preload="auto"></audio>
                 </div>
               </div>
@@ -238,24 +240,24 @@
               </div>
             </div>
 
-            <!-- Ringing Duration (Max 15 seconds) -->
+            <!-- Ringing Duration (Max 60 soniya / 1 daqiqa) -->
             <div class="form-row">
               <div class="form-label-row">
-                <label class="form-label">Qo'ng'iroq davomiyligi:</label>
-                <span class="form-hint-badge">Maks. 15 soniya</span>
+                <label class="form-label">Qo'ng'iroq / Musiqa davomiyligi:</label>
+                <span class="form-hint-badge">Maks. 1 daqiqa</span>
               </div>
               <div class="duration-options">
                 <label class="radio-chip">
-                  <input type="radio" name="ringDuration" value="5">
-                  <span>5 soniya</span>
+                  <input type="radio" name="ringDuration" value="15">
+                  <span>15 soniya</span>
                 </label>
                 <label class="radio-chip">
-                  <input type="radio" name="ringDuration" value="10">
-                  <span>10 soniya</span>
+                  <input type="radio" name="ringDuration" value="30">
+                  <span>30 soniya</span>
                 </label>
                 <label class="radio-chip">
-                  <input type="radio" name="ringDuration" value="15" checked>
-                  <span>15 soniya (tavsiya)</span>
+                  <input type="radio" name="ringDuration" value="60" checked>
+                  <span>60 soniya (1 daqiqa - Tavsiya)</span>
                 </label>
               </div>
             </div>

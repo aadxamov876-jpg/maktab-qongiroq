@@ -185,6 +185,7 @@ class AlarmAudioEngine {
     this.isMuted = false;
     this.engineSafetyTimeoutId = null;
     this.qongiroqAudio = null;
+    this.barkamolAudio = null;
   }
 
   init() {
@@ -300,15 +301,28 @@ class AlarmAudioEngine {
     }
   }
 
-  // Loop pattern until stopped (strictly capped at max 15 seconds)
-  startContinuousRinging(soundType = 'qongiroq', maxDurationSec = 15) {
+  // Loop pattern until stopped (maxDurationSec: up to 60 seconds / 1 minute)
+  startContinuousRinging(soundType = 'barkamol', maxDurationSec = 60) {
     this.stopAll();
 
-    // Audio Engine level safety: Never play for more than 15 seconds
-    const safeDurationMs = Math.min(Math.max(maxDurationSec || 15, 1), 15) * 1000;
+    // Safety timeout: up to 60 seconds (1 minute)
+    const safeDurationMs = Math.min(Math.max(maxDurationSec || 60, 1), 60) * 1000;
     this.engineSafetyTimeoutId = setTimeout(() => {
       this.stopAll();
     }, safeDurationMs);
+
+    if (soundType === 'barkamol') {
+      this.init();
+      const audioEl = document.getElementById('barkamolAudio') || new Audio('barkamol_avlod.mp3');
+      this.barkamolAudio = audioEl;
+      this.barkamolAudio.currentTime = 0;
+      this.barkamolAudio.loop = false;
+      const playPromise = this.barkamolAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => console.warn("Barkamol avlod play error:", e));
+      }
+      return;
+    }
 
     if (soundType === 'qongiroq') {
       this.init();
@@ -331,8 +345,35 @@ class AlarmAudioEngine {
   }
 
   // Play quick sample (preview)
-  previewSound(soundType = 'qongiroq', onEndCallback) {
+  previewSound(soundType = 'barkamol', onEndCallback) {
     this.stopAll();
+
+    if (soundType === 'barkamol') {
+      this.init();
+      const audioEl = document.getElementById('barkamolAudio') || new Audio('barkamol_avlod.mp3');
+      this.barkamolAudio = audioEl;
+      this.barkamolAudio.currentTime = 0;
+      this.barkamolAudio.loop = false;
+      const playPromise = this.barkamolAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => console.warn("Barkamol preview play error:", e));
+      }
+
+      const handleEnd = () => {
+        this.stopAll();
+        if (onEndCallback) onEndCallback();
+        if (this.barkamolAudio) {
+          this.barkamolAudio.removeEventListener('ended', handleEnd);
+        }
+      };
+      this.barkamolAudio.addEventListener('ended', handleEnd);
+
+      // Sinov uchun 15 soniya tinglab ko'rish kifoya (yoki to'xtatish tugmasi bor)
+      STATE.previewTimeoutId = setTimeout(() => {
+        handleEnd();
+      }, 15000);
+      return;
+    }
 
     if (soundType === 'qongiroq') {
       this.init();
@@ -376,6 +417,14 @@ class AlarmAudioEngine {
     if (this.engineSafetyTimeoutId) {
       clearTimeout(this.engineSafetyTimeoutId);
       this.engineSafetyTimeoutId = null;
+    }
+    if (this.barkamolAudio) {
+      try {
+        this.barkamolAudio.pause();
+        this.barkamolAudio.currentTime = 0;
+      } catch (e) {
+        console.warn("Barkamol audio pause error:", e);
+      }
     }
     if (this.qongiroqAudio) {
       try {
@@ -596,13 +645,13 @@ function loadAlarms() {
 
     if (saved) {
       STATE.alarms = JSON.parse(saved);
-      // Strictly enforce max 15 seconds ringing duration on all loaded bells
+      // Enforce max 60 seconds ringing duration on all loaded bells
       STATE.alarms.forEach(a => {
         const d = parseInt(a.durationSeconds, 10);
-        if (isNaN(d) || d > 15 || d <= 0) {
-          a.durationSeconds = 15;
+        if (isNaN(d) || d > 60 || d <= 0) {
+          a.durationSeconds = 60;
         }
-        if (!a.sound) a.sound = 'qongiroq';
+        if (!a.sound) a.sound = 'barkamol';
       });
     }
   } catch (err) {
@@ -632,7 +681,7 @@ function loadStandardSchoolSchedule() {
   const breakLabel = (STATE.bigBreakDuration === 5) ? "5 daqiqa (qisqartirilgan)" : "10 daqiqa (standart)";
 
   if (STATE.alarms.length > 0) {
-    const shouldAdd = confirm(`1-smena dars jadvali (${breakLabel} katta tanaffus bilan) yuklansinmi?\n\nMavjud jadval yangilanadi.`);
+    const shouldAdd = confirm(`1-smena dars jadvali (${breakLabel} katta tanaffus bilan) yuklansinmi?\n\nMavjud dars jadvali qo'ng'iroqlari yangilanadi.`);
     if (!shouldAdd) return;
 
     // Avvalgi dars jadvali qo'ng'iroqlarini tozalab, to'liq yangisini joylash
@@ -647,9 +696,9 @@ function loadStandardSchoolSchedule() {
       minute: item.minute,
       second: item.second,
       title: item.title,
-      sound: 'qongiroq',
+      sound: 'barkamol', // Ozodbek Nazarbekov - Barkamol avlod!
       snoozeMinutes: 5,
-      durationSeconds: 15,
+      durationSeconds: 60, // 1 minut yangraydi
       enabled: true,
       createdAt: Date.now() + index
     });
@@ -657,7 +706,7 @@ function loadStandardSchoolSchedule() {
   });
 
   saveAlarms();
-  showToast(`🏫 Dars jadvali (${breakLabel} tanaffus, ${addedCount} ta qo'ng'iroq) yuklandi!`, "success");
+  showToast(`🏫 Dars jadvali (${breakLabel} tanaffus, 'Barkamol avlod' madhiyasi bilan) yuklandi!`, "success");
 }
 
 /* ==========================================================
@@ -731,16 +780,16 @@ function checkAlarmTriggers(now) {
   }
 }
 
-// Trigger Bell Ringing (Max 15 seconds)
+// Trigger Bell Ringing (Max 60 seconds / 1 minute)
 function triggerAlarm(alarm) {
   STATE.activeRingingAlarm = alarm;
 
-  // Enforce max 15 seconds ringing duration
-  const MAX_RING_SECONDS = 15;
+  // Enforce max 60 seconds (1 minute) ringing duration
+  const MAX_RING_SECONDS = 60;
   const durationSec = Math.min(Math.max(parseInt(alarm.durationSeconds || MAX_RING_SECONDS, 10), 1), MAX_RING_SECONDS);
 
-  // Sound playback (default: qongiroq MP3)
-  soundEngine.startContinuousRinging(alarm.sound || 'qongiroq', durationSec);
+  // Sound playback (default: barkamol MP3)
+  soundEngine.startContinuousRinging(alarm.sound || 'barkamol', durationSec);
 
   // Update Ringing Modal text
   const timeFormatted = `${String(alarm.hour).padStart(2, '0')}:${String(alarm.minute).padStart(2, '0')}`;
@@ -944,6 +993,11 @@ function renderAlarmsList() {
     // Calculate time remaining countdown
     const countdownText = alarm.enabled ? getCountdownText(alarm) : "O'chirilgan";
 
+    // Calculate duration display and sound badge
+    const durSec = parseInt(alarm.durationSeconds, 10) || 60;
+    const durLabel = (durSec >= 60) ? `${Math.floor(durSec / 60)} daq` : `${durSec}s`;
+    const soundBadge = (alarm.sound === 'barkamol') ? '🎵 Barkamol avlod' : (alarm.sound === 'qongiroq' ? '🔔 Qo\'ng\'iroq' : '⏱️');
+
     item.innerHTML = `
       <div class="alarm-item-left">
         <div class="alarm-item-time">
@@ -952,7 +1006,7 @@ function renderAlarmsList() {
         </div>
         <div class="alarm-item-info">
           <span class="alarm-item-title">${escapeHtml(alarm.title || "Dars qo'ng'irog'i")}</span>
-          <span class="alarm-item-duration" title="Qo'ng'iroq davomiyligi: maks. 15 soniya">⏱️ ${alarm.durationSeconds || 15}s</span>
+          <span class="alarm-item-duration" title="Ohang: ${alarm.sound || 'barkamol'}, davomiyligi: ${durSec} soniya">${soundBadge} (${durLabel})</span>
           <span class="alarm-item-countdown" data-countdown-id="${alarm.id}">${countdownText}</span>
         </div>
       </div>
@@ -1245,13 +1299,13 @@ function setupEventListeners() {
         if (isNaN(s) || s < 0 || s > 59) s = 0;
 
         const title = DOM.alarmTitle.value.trim() || "Dars qo'ng'irog'i";
-        const sound = DOM.alarmSound.value || "qongiroq";
+        const sound = (DOM.alarmSound && DOM.alarmSound.value) ? DOM.alarmSound.value : "barkamol";
         const snoozeRadio = document.querySelector('input[name="snoozeTime"]:checked');
         const snoozeMinutes = snoozeRadio ? parseInt(snoozeRadio.value, 10) : 5;
 
-        // Enforce maximum 15 seconds duration
+        // Enforce maximum 60 seconds (1 minute) duration
         const durationRadio = document.querySelector('input[name="ringDuration"]:checked');
-        const ringDuration = durationRadio ? Math.min(Math.max(parseInt(durationRadio.value, 10) || 15, 1), 15) : 15;
+        const ringDuration = durationRadio ? Math.min(Math.max(parseInt(durationRadio.value, 10) || 60, 1), 60) : 60;
 
         const newAlarm = {
           id: 'bell_' + Date.now(),
