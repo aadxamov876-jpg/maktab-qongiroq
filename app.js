@@ -13,10 +13,33 @@
  * - Sport mashg'ulotlari va musobaqalar uchun sekundomer
  */
 
+// Standart va sozlanuvchi smena parametrlari (1- va 2-smena)
+const DEFAULT_SHIFT_SETTINGS = {
+  s1: { startH: 8, startM: 0, lessons: 6, duration: 45, breakDur: 5, bigBreak: 5 },
+  s2: { startH: 13, startM: 10, lessons: 6, duration: 45, breakDur: 5, bigBreak: 5 }
+};
+
+function loadStoredShiftSettings() {
+  try {
+    const raw = localStorage.getItem('smart_qongiroq_shift_settings');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        s1: { ...DEFAULT_SHIFT_SETTINGS.s1, ...(parsed.s1 || {}) },
+        s2: { ...DEFAULT_SHIFT_SETTINGS.s2, ...(parsed.s2 || {}) }
+      };
+    }
+  } catch (e) {
+    console.warn("Shift settings yuklashda xatolik:", e);
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_SHIFT_SETTINGS));
+}
+
 // State Management
 const STATE = {
   is24Hour: true,
-  bigBreakDuration: parseInt(localStorage.getItem('smart_qongiroq_big_break') || '10', 10),
+  bigBreakDuration: parseInt(localStorage.getItem('smart_qongiroq_big_break') || '5', 10),
+  shiftSettings: loadStoredShiftSettings(),
   alarms: [],
   activeRingingAlarm: null,
   ringingIntervalId: null,
@@ -67,20 +90,26 @@ const UZ_DAYS = [
  * @param {number} [customLongBreak] - Katta tanaffus davomiyligi (10 yoki 5 daqiqa)
  * @returns {number} Tanaffus davomiyligi daqiqalarda
  */
-function getBreakDuration(lessonNumber, totalLessons = 6, customLongBreak = null) {
+/**
+ * Dars raqamiga qarab tanaffus davomiyligini hisoblovchi funksiya
+ * @param {number} lessonNumber - Dars raqami (1, 2, 3...)
+ * @param {number} totalLessons - Jami darslar soni (standart: 6)
+ * @param {number} [customLongBreak] - Katta tanaffus davomiyligi (10 yoki 5 daqiqa)
+ * @param {number} [shift=1] - Smena raqami
+ * @param {number} [regularBreak=5] - Oddiy tanaffus davomiyligi
+ * @returns {number} Tanaffus davomiyligi daqiqalarda
+ */
+function getBreakDuration(lessonNumber, totalLessons = 6, customLongBreak = null, shift = 1, regularBreak = 5) {
   // Oxirgi darsdan keyin tanaffus bo'lmaydi
   if (lessonNumber >= totalLessons) {
     return 0;
   }
-  // Katta tanaffus FAQAT 3-darsdan keyin bo'ladi (10 daqiqa yoki 5 daqiqaga kichraytirilgan)
-  if (lessonNumber === 3) {
-    if (customLongBreak !== null && customLongBreak !== undefined) {
-      return customLongBreak;
-    }
-    return (STATE && STATE.bigBreakDuration) ? STATE.bigBreakDuration : 10;
+  // 3-darsdan keyin agar katta tanaffus belgilangan bo'lsa
+  if (lessonNumber === 3 && customLongBreak !== null && customLongBreak !== undefined) {
+    return customLongBreak;
   }
-  // Oddiy tanaffus (qisqa) faqat darslar orasida: 5 daqiqa
-  return 5;
+  // Standart tanaffuslar
+  return regularBreak || 5;
 }
 
 /**
@@ -90,8 +119,10 @@ function getBreakDuration(lessonNumber, totalLessons = 6, customLongBreak = null
  * @param {number} [options.startMinute=0] - Boshlanish daqiqasi
  * @param {number} [options.totalLessons=6] - Jami darslar soni
  * @param {number} [options.lessonDuration=45] - Dars davomiyligi (daqiqa)
- * @param {number} [options.longBreakDuration] - Katta tanaffus (10 yoki 5 daqiqa)
- * @returns {Array<{hour: string, minute: string, second: string, title: string}>}
+ * @param {number} [options.breakDuration=5] - Oddiy tanaffus davomiyligi
+ * @param {number} [options.longBreakDuration=5] - Katta tanaffus (10 yoki 5 daqiqa)
+ * @param {number} [options.shift=1] - Smena raqami (1 yoki 2)
+ * @returns {Array<{hour: string, minute: string, second: string, title: string, sound: string, shift: number}>}
  */
 function calculateSchoolSchedule(options = {}) {
   const {
@@ -99,7 +130,9 @@ function calculateSchoolSchedule(options = {}) {
     startMinute = 0,
     totalLessons = 6,
     lessonDuration = 45,
-    longBreakDuration = (STATE && STATE.bigBreakDuration) ? STATE.bigBreakDuration : 10
+    breakDuration = 5,
+    longBreakDuration = 5,
+    shift = 1
   } = options;
 
   const schedule = [];
@@ -115,62 +148,83 @@ function calculateSchoolSchedule(options = {}) {
     };
   };
 
+  const shiftLabel = `${shift}-smena: `;
+
   for (let lesson = 1; lesson <= totalLessons; lesson++) {
-    // Dars boshlanishi
+    // Dars boshlanishi (1 minutlik Barkamol avlod qo'shig'i)
     const startTime = formatTime(currentTotalMinutes);
     schedule.push({
       hour: startTime.hour,
       minute: startTime.minute,
       second: startTime.second,
-      title: `${lesson}-Dars boshlanishi`
+      title: `${shiftLabel}${lesson}-Dars boshlanishi (Barkamol avlod - 1 daq)`,
+      sound: 'barkamol', // 1 minutlik Barkamol avlod qo'shig'i!
+      durationSeconds: 60,
+      shift: shift
     });
 
     // Dars tugashi
     currentTotalMinutes += lessonDuration;
     const endTime = formatTime(currentTotalMinutes);
 
-    const breakDuration = getBreakDuration(lesson, totalLessons, longBreakDuration);
+    const currBreakDur = getBreakDuration(lesson, totalLessons, longBreakDuration, shift, breakDuration);
 
     if (lesson === totalLessons) {
-      // Darslar yakuni (oxirgi darsdan keyin tanaffus qo'shilmaydi)
+      // Darslar yakuni (Oxirgi ohang: 1 minutlik Barkamol avlod!)
       schedule.push({
         hour: endTime.hour,
         minute: endTime.minute,
         second: endTime.second,
-        title: "Darslar yakuni (Katta qo'ng'iroq)"
+        title: `${shiftLabel}Darslar yakuni (Oxirgi ohang - Barkamol avlod)`,
+        sound: 'barkamol', // 1 minutlik Ozodbek Nazarbekov - Barkamol avlod!
+        durationSeconds: 60,
+        shift: shift
       });
-    } else if (lesson === 3) {
-      // FAQAT 3-darsdan keyin katta tanaffus
+    } else if (lesson === 3 && currBreakDur > breakDuration) {
+      // Katta tanaffus (1 minutlik Barkamol avlod)
       schedule.push({
         hour: endTime.hour,
         minute: endTime.minute,
         second: endTime.second,
-        title: `Katta tanaffus (${breakDuration} daqiqa)`
+        title: `${shiftLabel}Katta tanaffus (${currBreakDur} daq - Barkamol avlod)`,
+        sound: 'barkamol', // 1 minutlik Barkamol avlod qo'shig'i!
+        durationSeconds: 60,
+        shift: shift
       });
-      currentTotalMinutes += breakDuration;
+      currentTotalMinutes += currBreakDur;
     } else {
-      // Oddiy qisqa tanaffus
+      // Standart tanaffus (1 minutlik Barkamol avlod qo'shig'i)
       schedule.push({
         hour: endTime.hour,
         minute: endTime.minute,
         second: endTime.second,
-        title: `${lesson}-Tanaffus (Dars tugashi)`
+        title: `${shiftLabel}${lesson}-Tanaffus (Barkamol avlod - 1 daq)`,
+        sound: 'barkamol', // 1 minutlik Barkamol avlod qo'shig'i!
+        durationSeconds: 60,
+        shift: shift
       });
-      currentTotalMinutes += breakDuration;
+      currentTotalMinutes += currBreakDur;
     }
   }
 
   return schedule;
 }
 
-// Standart 1-smena maktab dars jadvali
-function getStandardSchoolSchedule() {
+// Standart va sozlanuvchi 1-smena va 2-smena maktab dars jadvali
+function getStandardSchoolSchedule(shift = 1) {
+  const sKey = shift === 2 ? 's2' : 's1';
+  const cfg = (STATE.shiftSettings && STATE.shiftSettings[sKey])
+    ? STATE.shiftSettings[sKey]
+    : DEFAULT_SHIFT_SETTINGS[sKey];
+
   return calculateSchoolSchedule({
-    startHour: 8,
-    startMinute: 0,
-    totalLessons: 6,
-    lessonDuration: 45,
-    longBreakDuration: (STATE && STATE.bigBreakDuration) ? STATE.bigBreakDuration : 10
+    startHour: parseInt(cfg.startH, 10),
+    startMinute: parseInt(cfg.startM, 10),
+    totalLessons: parseInt(cfg.lessons, 10) || 6,
+    lessonDuration: parseInt(cfg.duration, 10) || 45,
+    breakDuration: parseInt(cfg.breakDur, 10) || 5,
+    longBreakDuration: parseInt(cfg.bigBreak, 10) || parseInt(cfg.breakDur, 10) || 5,
+    shift: shift
   });
 }
 
@@ -484,6 +538,13 @@ const DOM = {
   alarmCountSubtitle: document.getElementById('alarmCountSubtitle'),
   clearAllAlarmsBtn: document.getElementById('clearAllAlarmsBtn'),
   loadStandardScheduleBtn: document.getElementById('loadStandardScheduleBtn'),
+  loadShift1Btn: document.getElementById('loadShift1Btn'),
+  loadShift2Btn: document.getElementById('loadShift2Btn'),
+  loadAllShiftsBtn: document.getElementById('loadAllShiftsBtn'),
+  tabPresetShift1: document.getElementById('tabPresetShift1'),
+  tabPresetShift2: document.getElementById('tabPresetShift2'),
+  presetsRowShift1: document.getElementById('presetsRowShift1'),
+  presetsRowShift2: document.getElementById('presetsRowShift2'),
   break10Btn: document.getElementById('break10Btn'),
   break5Btn: document.getElementById('break5Btn'),
   currentBreakBadge: document.getElementById('currentBreakBadge'),
@@ -492,6 +553,33 @@ const DOM = {
   presetChipB4: document.getElementById('presetChipB4'),
   presetChipL5: document.getElementById('presetChipL5'),
   presetChipEnd: document.getElementById('presetChipEnd'),
+
+  // Shift Customizer
+  toggleShiftSettingsBtn: document.getElementById('toggleShiftSettingsBtn'),
+  shiftSettingsPanel: document.getElementById('shiftSettingsPanel'),
+  shiftSettingsArrow: document.getElementById('shiftSettingsArrow'),
+  shiftSettingsStatusBadge: document.getElementById('shiftSettingsStatusBadge'),
+  tabShiftCfg1: document.getElementById('tabShiftCfg1'),
+  tabShiftCfg2: document.getElementById('tabShiftCfg2'),
+  shiftConfigForm1: document.getElementById('shiftConfigForm1'),
+  shiftConfigForm2: document.getElementById('shiftConfigForm2'),
+  cfgS1Start: document.getElementById('cfgS1Start'),
+  cfgS1Lessons: document.getElementById('cfgS1Lessons'),
+  cfgS1Duration: document.getElementById('cfgS1Duration'),
+  cfgS1Break: document.getElementById('cfgS1Break'),
+  cfgS1BigBreak: document.getElementById('cfgS1BigBreak'),
+  cfgS1Preview: document.getElementById('cfgS1Preview'),
+  cfgS2Start: document.getElementById('cfgS2Start'),
+  cfgS2Lessons: document.getElementById('cfgS2Lessons'),
+  cfgS2Duration: document.getElementById('cfgS2Duration'),
+  cfgS2Break: document.getElementById('cfgS2Break'),
+  cfgS2BigBreak: document.getElementById('cfgS2BigBreak'),
+  cfgS2Preview: document.getElementById('cfgS2Preview'),
+  saveShiftConfigBtn: document.getElementById('saveShiftConfigBtn'),
+  resetShiftConfigBtn: document.getElementById('resetShiftConfigBtn'),
+  shift1ButtonTimeLabel: document.getElementById('shift1ButtonTimeLabel'),
+  shift2ButtonTimeLabel: document.getElementById('shift2ButtonTimeLabel'),
+  allShiftsButtonTimeLabel: document.getElementById('allShiftsButtonTimeLabel'),
 
   // Ringing Modal
   ringingModal: document.getElementById('ringingModal'),
@@ -538,8 +626,13 @@ function initApp() {
   updateLiveClock();
   setInterval(updateLiveClock, 500); // Check time & bells twice every second
 
-  // Set initial big break duration state & update UI
-  setBigBreakDuration(STATE.bigBreakDuration || 10);
+  // Set initial big break duration state & update UI (default: 5 min -> 12:55 finish)
+  setBigBreakDuration(STATE.bigBreakDuration || 5);
+
+  // Initialize Shift Customizer UI and dynamic elements
+  initShiftCustomizerUI();
+  updateShiftButtonLabels();
+  renderDynamicPresetChips();
 
   // Set default form time to +5 minutes from now
   setDefaultFormTime(5);
@@ -555,7 +648,7 @@ function initApp() {
  * @param {number} duration - 10 yoki 5 daqiqa
  */
 function setBigBreakDuration(duration) {
-  duration = parseInt(duration, 10) || 10;
+  duration = parseInt(duration, 10) || 5;
   STATE.bigBreakDuration = duration;
   try {
     localStorage.setItem('smart_qongiroq_big_break', String(duration));
@@ -570,16 +663,16 @@ function setBigBreakDuration(duration) {
   // Update badge
   const badge = DOM.currentBreakBadge || document.getElementById('currentBreakBadge');
   if (badge) {
-    badge.textContent = `${duration} daqiqa`;
+    badge.textContent = duration === 5 ? "5 daqiqa (12:55 da tugash)" : "10 daqiqa (13:00 da tugash)";
   }
 
   // Update live explanatory hint
   const hint = DOM.breakTimeHint || document.getElementById('breakTimeHint');
   if (hint) {
     if (duration === 5) {
-      hint.innerHTML = `📌 <b>Qisqartirilgan:</b> 3-dars (10:25) ➔ 5 daq tanaffus ➔ 4-dars (10:30) ➔ 11:15 tugashi ➔ 11:20 5-dars ➔ 6-dars yakuni: <b>12:55</b>`;
+      hint.innerHTML = `📌 <b>1-smena:</b> 08:00 ➔ 6 ta dars (5 daq tanaffus) ➔ <b>12:55</b> da darslar tugaydi va <b>"Barkamol avlod" (oxirgi ohang)</b> yangraydi!`;
     } else {
-      hint.innerHTML = `📌 <b>Standart:</b> 3-dars (10:25) ➔ 10 daq tanaffus ➔ 4-dars (10:35) ➔ 11:20 tugashi ➔ 11:25 5-dars ➔ 6-dars yakuni: <b>13:00</b>`;
+      hint.innerHTML = `📌 <b>1-smena (10 daq katta tanaffus bilan):</b> 3-dars (10:25) ➔ 10 daq tanaffus ➔ 4-dars (10:35) ➔ <b>13:00</b> da darslar tugaydi.`;
     }
   }
 
@@ -592,33 +685,41 @@ function setBigBreakDuration(duration) {
   if (pL4) {
     const timeL4 = duration === 5 ? "10:30" : "10:35";
     pL4.dataset.time = timeL4;
-    pL4.textContent = `${timeL4} (4-dars)`;
+    pL4.dataset.sound = "barkamol";
+    pL4.dataset.title = "1-smena: 4-Dars boshlanishi";
+    pL4.textContent = `🎵 ${timeL4} (4-dars)`;
   }
   if (pB4) {
     const timeB4 = duration === 5 ? "11:15" : "11:20";
     pB4.dataset.time = timeB4;
+    pB4.dataset.sound = "barkamol";
+    pB4.dataset.title = "1-smena: 4-Tanaffus (Barkamol avlod)";
     pB4.textContent = `${timeB4} (4-tanaffus)`;
   }
   if (pL5) {
     const timeL5 = duration === 5 ? "11:20" : "11:25";
     pL5.dataset.time = timeL5;
-    pL5.textContent = `${timeL5} (5-dars)`;
+    pL5.dataset.sound = "barkamol";
+    pL5.dataset.title = "1-smena: 5-Dars boshlanishi";
+    pL5.textContent = `🎵 ${timeL5} (5-dars)`;
   }
   if (pEnd) {
     const timeEnd = duration === 5 ? "12:55" : "13:00";
     pEnd.dataset.time = timeEnd;
-    pEnd.textContent = `${timeEnd} (Dars yakuni)`;
+    pEnd.dataset.sound = "barkamol";
+    pEnd.dataset.title = "1-smena: Darslar yakuni (Oxirgi ohang - Barkamol avlod)";
+    pEnd.textContent = `🏁 ${timeEnd} (1-smena yakuni)`;
   }
 }
 
 // Global click handler for break toggle buttons (accessible via inline onclick and JS)
 window.handleBreakToggle = function(duration) {
-  duration = parseInt(duration, 10) || 10;
+  duration = parseInt(duration, 10) || 5;
   setBigBreakDuration(duration);
   if (duration === 5) {
-    showToast("⚡ Katta tanaffus 5 daqiqa (qisqartirilgan) qilib belgilandi: 10:30 da 4-dars!", "info");
+    showToast("⚡ 1-smena: 5 daqiqalik tanaffus tartibi (12:55 da dars yakuni va 'Barkamol avlod')", "info");
   } else {
-    showToast("🥪 Katta tanaffus 10 daqiqa (standart) qilib belgilandi", "info");
+    showToast("🥪 1-smena: 3-darsdan so'ng 10 daqiqa katta tanaffus (13:00 da dars yakuni)", "info");
   }
 };
 
@@ -645,14 +746,28 @@ function loadAlarms() {
 
     if (saved) {
       STATE.alarms = JSON.parse(saved);
-      // Enforce max 60 seconds ringing duration on all loaded bells
+      // Standart bo'yicha HAMMASI 1 minutlik Barkamol avlod qo'shig'i bo'lishi ta'minlanadi
       STATE.alarms.forEach(a => {
-        const d = parseInt(a.durationSeconds, 10);
-        if (isNaN(d) || d > 60 || d <= 0) {
-          a.durationSeconds = 60;
-        }
-        if (!a.sound) a.sound = 'barkamol';
+        a.sound = 'barkamol';
+        a.durationSeconds = 60;
       });
+      saveAlarms();
+    } else {
+      // Dastlabki yuklash: Standart 1-smena dars jadvalini tayyorlab qo'yish (hammasi 1 daqiqalik Barkamol avlod)
+      const defaultSchedule = getStandardSchoolSchedule(1);
+      STATE.alarms = defaultSchedule.map((item, index) => ({
+        id: `bell_std_${item.shift || 1}_${Date.now()}_${index}`,
+        hour: item.hour,
+        minute: item.minute,
+        second: item.second,
+        title: item.title,
+        sound: 'barkamol',
+        snoozeMinutes: 5,
+        durationSeconds: 60,
+        enabled: true,
+        createdAt: Date.now() + index
+      }));
+      saveAlarms();
     }
   } catch (err) {
     console.error("Qo'ng'iroqlarni yuklashda xatolik:", err);
@@ -674,31 +789,61 @@ function saveAlarms() {
 }
 
 /* ==========================================================
-   STANDARD SCHOOL TIMETABLE LOADER
+   STANDARD SCHOOL TIMETABLE LOADER (1-SMENA VA 2-SMENA)
    ========================================================== */
-function loadStandardSchoolSchedule() {
-  const currentSchedule = getStandardSchoolSchedule();
-  const breakLabel = (STATE.bigBreakDuration === 5) ? "5 daqiqa (qisqartirilgan)" : "10 daqiqa (standart)";
+function loadSchoolSchedule(shift = 1) {
+  let scheduleItems = [];
+  let shiftLabel = "";
 
+  if (shift === 1) {
+    scheduleItems = getStandardSchoolSchedule(1);
+    const breakLabel = (STATE.bigBreakDuration === 10) ? "10 daqiqa katta tanaffus, 13:00 tugash" : "12:55 darslar yakuni";
+    shiftLabel = `1-smena (08:00 - 12:55, ${breakLabel})`;
+  } else if (shift === 2) {
+    scheduleItems = getStandardSchoolSchedule(2);
+    shiftLabel = "2-smena (13:10 - 18:05, 18:05 darslar yakuni)";
+  } else if (shift === 'all' || shift === 3) {
+    scheduleItems = [...getStandardSchoolSchedule(1), ...getStandardSchoolSchedule(2)];
+    shiftLabel = "1- va 2-smena to'liq kunlik (08:00 - 18:05)";
+  }
+
+  // Confirmation if bells already exist
   if (STATE.alarms.length > 0) {
-    const shouldAdd = confirm(`1-smena dars jadvali (${breakLabel} katta tanaffus bilan) yuklansinmi?\n\nMavjud dars jadvali qo'ng'iroqlari yangilanadi.`);
+    let confirmPrompt = `🏫 ${shiftLabel} jadvali yuklansinmi?\n\n`;
+    if (shift === 1 && STATE.alarms.some(a => a.id.startsWith('bell_std_2_') || (a.title && a.title.includes('2-smena')))) {
+      confirmPrompt += "• Mavjud 2-smena qo'ng'iroqlari saqlanadi, 1-smena yangilanadi.\n• Barcha dars va tanaffuslarda 1 minutlik 'Barkamol avlod' qo'shig'i yangraydi.";
+    } else if (shift === 2 && STATE.alarms.some(a => a.id.startsWith('bell_std_1_') || (a.title && a.title.includes('1-smena')))) {
+      confirmPrompt += "• Mavjud 1-smena qo'ng'iroqlari saqlanadi, 2-smena qo'shiladi.\n• Barcha dars va tanaffuslarda 1 minutlik 'Barkamol avlod' qo'shig'i yangraydi.";
+    } else if (shift === 'all' || shift === 3) {
+      confirmPrompt += "• Ertalab 08:00 dan kechki 18:05 gacha bo'lgan barcha 24 ta dars va tanaffus qo'ng'iroqlari yuklanadi.\n• Hammasida 1 minutlik 'Barkamol avlod' qo'shig'i yangraydi.";
+    } else {
+      confirmPrompt += "• Barcha qo'ng'iroqlarda (dars boshlanishi, tanaffuslar va darslar yakunida) 1 minutlik 'Barkamol avlod' qo'shig'i yangraydi.";
+    }
+
+    const shouldAdd = confirm(confirmPrompt);
     if (!shouldAdd) return;
 
-    // Avvalgi dars jadvali qo'ng'iroqlarini tozalab, to'liq yangisini joylash
-    STATE.alarms = STATE.alarms.filter(a => !a.id.startsWith('bell_std_'));
+    // Filter out previous bells of this specific shift
+    if (shift === 1) {
+      STATE.alarms = STATE.alarms.filter(a => !a.id.startsWith('bell_std_1_') && !(a.id.startsWith('bell_std_') && !a.id.startsWith('bell_std_2_')));
+    } else if (shift === 2) {
+      STATE.alarms = STATE.alarms.filter(a => !a.id.startsWith('bell_std_2_'));
+    } else {
+      STATE.alarms = STATE.alarms.filter(a => !a.id.startsWith('bell_std_'));
+    }
   }
 
   let addedCount = 0;
-  currentSchedule.forEach((item, index) => {
+  scheduleItems.forEach((item, index) => {
     STATE.alarms.push({
-      id: 'bell_std_' + Date.now() + '_' + index,
+      id: `bell_std_${item.shift || shift}_${Date.now()}_${index}`,
       hour: item.hour,
       minute: item.minute,
       second: item.second,
       title: item.title,
-      sound: 'barkamol', // Ozodbek Nazarbekov - Barkamol avlod!
+      sound: 'barkamol', // Hammasi 1 minutlik Barkamol avlod!
       snoozeMinutes: 5,
-      durationSeconds: 60, // 1 minut yangraydi
+      durationSeconds: 60, // 1 minut jaranglaydi
       enabled: true,
       createdAt: Date.now() + index
     });
@@ -706,7 +851,356 @@ function loadStandardSchoolSchedule() {
   });
 
   saveAlarms();
-  showToast(`🏫 Dars jadvali (${breakLabel} tanaffus, 'Barkamol avlod' madhiyasi bilan) yuklandi!`, "success");
+  const closingText = "Hammasi: 1 daqiqalik 'Barkamol avlod'";
+  showToast(`🏫 ${shiftLabel} muvaffaqiyatli yuklandi! (${closingText})`, "success");
+}
+
+function loadStandardSchoolSchedule() {
+  loadSchoolSchedule(1);
+}
+
+/* ==========================================================
+   MANUAL SHIFT CUSTOMIZATION LOGIC (1-SMENA VA 2-SMENA SOZLAMALARI)
+   ========================================================== */
+function parseTimeInput(timeStr, fallbackH = 8, fallbackM = 0) {
+  if (!timeStr || !timeStr.includes(':')) {
+    return { h: fallbackH, m: fallbackM };
+  }
+  const parts = timeStr.split(':');
+  let h = parseInt(parts[0], 10);
+  let m = parseInt(parts[1], 10);
+  if (isNaN(h) || h < 0 || h > 23) h = fallbackH;
+  if (isNaN(m) || m < 0 || m > 59) m = fallbackM;
+  return { h, m };
+}
+
+function formatTimeInputStr(h, m) {
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function initShiftCustomizerUI() {
+  const panel = DOM.shiftSettingsPanel || document.getElementById('shiftSettingsPanel');
+  const toggleBtn = DOM.toggleShiftSettingsBtn || document.getElementById('toggleShiftSettingsBtn');
+  const arrow = DOM.shiftSettingsArrow || document.getElementById('shiftSettingsArrow');
+
+  const tab1 = DOM.tabShiftCfg1 || document.getElementById('tabShiftCfg1');
+  const tab2 = DOM.tabShiftCfg2 || document.getElementById('tabShiftCfg2');
+  const form1 = DOM.shiftConfigForm1 || document.getElementById('shiftConfigForm1');
+  const form2 = DOM.shiftConfigForm2 || document.getElementById('shiftConfigForm2');
+
+  const s1Start = DOM.cfgS1Start || document.getElementById('cfgS1Start');
+  const s1Lessons = DOM.cfgS1Lessons || document.getElementById('cfgS1Lessons');
+  const s1Duration = DOM.cfgS1Duration || document.getElementById('cfgS1Duration');
+  const s1Break = DOM.cfgS1Break || document.getElementById('cfgS1Break');
+  const s1BigBreak = DOM.cfgS1BigBreak || document.getElementById('cfgS1BigBreak');
+
+  const s2Start = DOM.cfgS2Start || document.getElementById('cfgS2Start');
+  const s2Lessons = DOM.cfgS2Lessons || document.getElementById('cfgS2Lessons');
+  const s2Duration = DOM.cfgS2Duration || document.getElementById('cfgS2Duration');
+  const s2Break = DOM.cfgS2Break || document.getElementById('cfgS2Break');
+  const s2BigBreak = DOM.cfgS2BigBreak || document.getElementById('cfgS2BigBreak');
+
+  const saveBtn = DOM.saveShiftConfigBtn || document.getElementById('saveShiftConfigBtn');
+  const resetBtn = DOM.resetShiftConfigBtn || document.getElementById('resetShiftConfigBtn');
+
+  // Populate inputs from STATE
+  const cfg1 = (STATE.shiftSettings && STATE.shiftSettings.s1) ? STATE.shiftSettings.s1 : DEFAULT_SHIFT_SETTINGS.s1;
+  const cfg2 = (STATE.shiftSettings && STATE.shiftSettings.s2) ? STATE.shiftSettings.s2 : DEFAULT_SHIFT_SETTINGS.s2;
+
+  if (s1Start) s1Start.value = formatTimeInputStr(cfg1.startH, cfg1.startM);
+  if (s1Lessons) s1Lessons.value = String(cfg1.lessons);
+  if (s1Duration) s1Duration.value = String(cfg1.duration);
+  if (s1Break) s1Break.value = String(cfg1.breakDur);
+  if (s1BigBreak) s1BigBreak.value = String(cfg1.bigBreak);
+
+  if (s2Start) s2Start.value = formatTimeInputStr(cfg2.startH, cfg2.startM);
+  if (s2Lessons) s2Lessons.value = String(cfg2.lessons);
+  if (s2Duration) s2Duration.value = String(cfg2.duration);
+  if (s2Break) s2Break.value = String(cfg2.breakDur);
+  if (s2BigBreak) s2BigBreak.value = String(cfg2.bigBreak);
+
+  // Toggle open/close drawer
+  if (toggleBtn && panel) {
+    toggleBtn.addEventListener('click', () => {
+      const isClosed = panel.style.display === 'none' || panel.style.display === '';
+      panel.style.display = isClosed ? 'flex' : 'none';
+      toggleBtn.classList.toggle('open', isClosed);
+      if (arrow) arrow.textContent = isClosed ? '▲' : '▼';
+    });
+  }
+
+  // Tab switching (1-smena vs 2-smena)
+  if (tab1 && tab2 && form1 && form2) {
+    tab1.addEventListener('click', () => {
+      tab1.classList.add('active');
+      tab2.classList.remove('active');
+      form1.style.display = 'block';
+      form2.style.display = 'none';
+    });
+    tab2.addEventListener('click', () => {
+      tab2.classList.add('active');
+      tab1.classList.remove('active');
+      form1.style.display = 'none';
+      form2.style.display = 'block';
+    });
+  }
+
+  // Live input changes update previews
+  [s1Start, s1Lessons, s1Duration, s1Break, s1BigBreak, s2Start, s2Lessons, s2Duration, s2Break, s2BigBreak].forEach(input => {
+    if (!input) return;
+    input.addEventListener('input', updateShiftCustomizerPreviews);
+    input.addEventListener('change', updateShiftCustomizerPreviews);
+  });
+
+  // Save button
+  if (saveBtn) {
+    saveBtn.addEventListener('click', saveCustomShiftSettings);
+  }
+
+  // Reset button
+  if (resetBtn) {
+    resetBtn.addEventListener('click', resetCustomShiftSettings);
+  }
+
+  updateShiftCustomizerPreviews();
+}
+
+function updateShiftCustomizerPreviews() {
+  const s1Start = document.getElementById('cfgS1Start');
+  const s1Lessons = document.getElementById('cfgS1Lessons');
+  const s1Duration = document.getElementById('cfgS1Duration');
+  const s1Break = document.getElementById('cfgS1Break');
+  const s1BigBreak = document.getElementById('cfgS1BigBreak');
+  const preview1 = document.getElementById('cfgS1Preview');
+
+  const s2Start = document.getElementById('cfgS2Start');
+  const s2Lessons = document.getElementById('cfgS2Lessons');
+  const s2Duration = document.getElementById('cfgS2Duration');
+  const s2Break = document.getElementById('cfgS2Break');
+  const s2BigBreak = document.getElementById('cfgS2BigBreak');
+  const preview2 = document.getElementById('cfgS2Preview');
+
+  if (s1Start && preview1) {
+    const t1 = parseTimeInput(s1Start.value, 8, 0);
+    const lessons1 = parseInt(s1Lessons ? s1Lessons.value : 6, 10) || 6;
+    const dur1 = parseInt(s1Duration ? s1Duration.value : 45, 10) || 45;
+    const brk1 = parseInt(s1Break ? s1Break.value : 5, 10) || 5;
+    const bigBrk1 = parseInt(s1BigBreak ? s1BigBreak.value : 5, 10) || 5;
+
+    const tempSched1 = calculateSchoolSchedule({
+      startHour: t1.h,
+      startMinute: t1.m,
+      totalLessons: lessons1,
+      lessonDuration: dur1,
+      breakDuration: brk1,
+      longBreakDuration: bigBrk1,
+      shift: 1
+    });
+
+    const startStr = tempSched1[0] ? `${tempSched1[0].hour}:${tempSched1[0].minute}` : '08:00';
+    const endStr = tempSched1[tempSched1.length - 1] ? `${tempSched1[tempSched1.length - 1].hour}:${tempSched1[tempSched1.length - 1].minute}` : '12:55';
+    preview1.innerHTML = `📊 Hisoblangan: <b>${startStr} — ${endStr}</b> (${lessons1} ta dars, ${dur1} daq, tanaffus: ${brk1} daq, barchasida 1 daq Barkamol avlod)`;
+  }
+
+  if (s2Start && preview2) {
+    const t2 = parseTimeInput(s2Start.value, 13, 10);
+    const lessons2 = parseInt(s2Lessons ? s2Lessons.value : 6, 10) || 6;
+    const dur2 = parseInt(s2Duration ? s2Duration.value : 45, 10) || 45;
+    const brk2 = parseInt(s2Break ? s2Break.value : 5, 10) || 5;
+    const bigBrk2 = parseInt(s2BigBreak ? s2BigBreak.value : 5, 10) || 5;
+
+    const tempSched2 = calculateSchoolSchedule({
+      startHour: t2.h,
+      startMinute: t2.m,
+      totalLessons: lessons2,
+      lessonDuration: dur2,
+      breakDuration: brk2,
+      longBreakDuration: bigBrk2,
+      shift: 2
+    });
+
+    const startStr2 = tempSched2[0] ? `${tempSched2[0].hour}:${tempSched2[0].minute}` : '13:10';
+    const endStr2 = tempSched2[tempSched2.length - 1] ? `${tempSched2[tempSched2.length - 1].hour}:${tempSched2[tempSched2.length - 1].minute}` : '18:05';
+    preview2.innerHTML = `📊 Hisoblangan: <b>${startStr2} — ${endStr2}</b> (${lessons2} ta dars, ${dur2} daq, tanaffus: ${brk2} daq, barchasida 1 daq Barkamol avlod)`;
+  }
+}
+
+function saveCustomShiftSettings() {
+  const s1Start = document.getElementById('cfgS1Start');
+  const s1Lessons = document.getElementById('cfgS1Lessons');
+  const s1Duration = document.getElementById('cfgS1Duration');
+  const s1Break = document.getElementById('cfgS1Break');
+  const s1BigBreak = document.getElementById('cfgS1BigBreak');
+
+  const s2Start = document.getElementById('cfgS2Start');
+  const s2Lessons = document.getElementById('cfgS2Lessons');
+  const s2Duration = document.getElementById('cfgS2Duration');
+  const s2Break = document.getElementById('cfgS2Break');
+  const s2BigBreak = document.getElementById('cfgS2BigBreak');
+
+  const t1 = parseTimeInput(s1Start ? s1Start.value : '08:00', 8, 0);
+  const t2 = parseTimeInput(s2Start ? s2Start.value : '13:10', 13, 10);
+
+  STATE.shiftSettings = {
+    s1: {
+      startH: t1.h,
+      startM: t1.m,
+      lessons: parseInt(s1Lessons ? s1Lessons.value : 6, 10) || 6,
+      duration: parseInt(s1Duration ? s1Duration.value : 45, 10) || 45,
+      breakDur: parseInt(s1Break ? s1Break.value : 5, 10) || 5,
+      bigBreak: parseInt(s1BigBreak ? s1BigBreak.value : 5, 10) || 5
+    },
+    s2: {
+      startH: t2.h,
+      startM: t2.m,
+      lessons: parseInt(s2Lessons ? s2Lessons.value : 6, 10) || 6,
+      duration: parseInt(s2Duration ? s2Duration.value : 45, 10) || 45,
+      breakDur: parseInt(s2Break ? s2Break.value : 5, 10) || 5,
+      bigBreak: parseInt(s2BigBreak ? s2BigBreak.value : 5, 10) || 5
+    }
+  };
+
+  try {
+    localStorage.setItem('smart_qongiroq_shift_settings', JSON.stringify(STATE.shiftSettings));
+  } catch (e) {
+    console.error("Sozlamalarni saqlashda xatolik:", e);
+  }
+
+  updateShiftButtonLabels();
+  renderDynamicPresetChips();
+
+  const applyNow = confirm("✅ Yangi smena vaqtlari muvaffaqiyatli saqlandi!\n\nJoriy dars jadvaliga yangi vaqtlar hoziroq qo'llansinmi?");
+  if (applyNow) {
+    loadSchoolSchedule(1);
+  } else {
+    showToast("⚙️ Smena sozlamalari muvaffaqiyatli saqlandi!", "success");
+  }
+}
+
+function resetCustomShiftSettings() {
+  if (!confirm("Haqiqatan ham smena vaqtlarini standart holatga (08:00 va 13:10) qaytarmoqchimisiz?")) {
+    return;
+  }
+
+  STATE.shiftSettings = JSON.parse(JSON.stringify(DEFAULT_SHIFT_SETTINGS));
+  try {
+    localStorage.removeItem('smart_qongiroq_shift_settings');
+  } catch (e) {
+    console.error(e);
+  }
+
+  const s1Start = document.getElementById('cfgS1Start');
+  const s1Lessons = document.getElementById('cfgS1Lessons');
+  const s1Duration = document.getElementById('cfgS1Duration');
+  const s1Break = document.getElementById('cfgS1Break');
+  const s1BigBreak = document.getElementById('cfgS1BigBreak');
+
+  const s2Start = document.getElementById('cfgS2Start');
+  const s2Lessons = document.getElementById('cfgS2Lessons');
+  const s2Duration = document.getElementById('cfgS2Duration');
+  const s2Break = document.getElementById('cfgS2Break');
+  const s2BigBreak = document.getElementById('cfgS2BigBreak');
+
+  if (s1Start) s1Start.value = "08:00";
+  if (s1Lessons) s1Lessons.value = "6";
+  if (s1Duration) s1Duration.value = "45";
+  if (s1Break) s1Break.value = "5";
+  if (s1BigBreak) s1BigBreak.value = "5";
+
+  if (s2Start) s2Start.value = "13:10";
+  if (s2Lessons) s2Lessons.value = "6";
+  if (s2Duration) s2Duration.value = "45";
+  if (s2Break) s2Break.value = "5";
+  if (s2BigBreak) s2BigBreak.value = "5";
+
+  updateShiftCustomizerPreviews();
+  updateShiftButtonLabels();
+  renderDynamicPresetChips();
+
+  showToast("🔄 Smena vaqtlari standart holatga qaytarildi!", "info");
+}
+
+function updateShiftButtonLabels() {
+  const s1Schedule = getStandardSchoolSchedule(1);
+  const s2Schedule = getStandardSchoolSchedule(2);
+
+  const s1Start = s1Schedule[0] ? `${s1Schedule[0].hour}:${s1Schedule[0].minute}` : '08:00';
+  const s1End = s1Schedule[s1Schedule.length - 1] ? `${s1Schedule[s1Schedule.length - 1].hour}:${s1Schedule[s1Schedule.length - 1].minute}` : '12:55';
+
+  const s2Start = s2Schedule[0] ? `${s2Schedule[0].hour}:${s2Schedule[0].minute}` : '13:10';
+  const s2End = s2Schedule[s2Schedule.length - 1] ? `${s2Schedule[s2Schedule.length - 1].hour}:${s2Schedule[s2Schedule.length - 1].minute}` : '18:05';
+
+  const lbl1 = DOM.shift1ButtonTimeLabel || document.getElementById('shift1ButtonTimeLabel');
+  const lbl2 = DOM.shift2ButtonTimeLabel || document.getElementById('shift2ButtonTimeLabel');
+  const lblAll = DOM.allShiftsButtonTimeLabel || document.getElementById('allShiftsButtonTimeLabel');
+
+  if (lbl1) lbl1.textContent = `${s1Start} — ${s1End} (Hammasi: 1 daq Barkamol avlod)`;
+  if (lbl2) lbl2.textContent = `${s2Start} — ${s2End} (Hammasi: 1 daq Barkamol avlod)`;
+  if (lblAll) lblAll.textContent = `${s1Start} — ${s2End} (Barchasida 1 daq Barkamol avlod)`;
+}
+
+function renderDynamicPresetChips() {
+  const rowS1 = DOM.presetsRowShift1 || document.getElementById('presetsRowShift1');
+  const rowS2 = DOM.presetsRowShift2 || document.getElementById('presetsRowShift2');
+
+  const s1Schedule = getStandardSchoolSchedule(1);
+  const s2Schedule = getStandardSchoolSchedule(2);
+
+  if (rowS1) {
+    let html = '';
+    s1Schedule.forEach((item) => {
+      const timeStr = `${item.hour}:${item.minute}`;
+      const isEnd = item.title.includes('Darslar yakuni');
+      const isBreak = item.title.includes('Tanaffus');
+      const chipClass = isEnd ? 'preset-chip preset-chip-end' : (isBreak ? 'preset-chip preset-chip-break' : 'preset-chip preset-chip-lesson');
+      const icon = isEnd ? '🏁' : '🎵';
+      let shortLabel = timeStr;
+      if (item.title.includes('Dars boshlanishi')) {
+        const num = item.title.match(/(\d+)-Dars/);
+        shortLabel = `${timeStr} (${num ? num[1] : ''}-dars)`;
+      } else if (item.title.includes('Tanaffus')) {
+        const num = item.title.match(/(\d+)-Tanaffus/);
+        shortLabel = `${timeStr} (${num ? num[1] : ''}-tanaffus)`;
+      } else if (item.title.includes('Katta tanaffus')) {
+        shortLabel = `${timeStr} (Katta tanaffus)`;
+      } else if (isEnd) {
+        shortLabel = `${timeStr} (1-smena yakuni)`;
+      }
+
+      html += `<button type="button" class="${chipClass}" data-time="${timeStr}" data-title="${escapeHtml(item.title)}" data-sound="barkamol">${icon} ${shortLabel}</button>\n`;
+    });
+    html += `<button type="button" class="preset-chip" data-offset="1" data-sound="barkamol">+1 daq (Sinov)</button>\n`;
+    html += `<button type="button" class="preset-chip" data-offset="5" data-sound="barkamol">+5 daq</button>`;
+    rowS1.innerHTML = html;
+  }
+
+  if (rowS2) {
+    let html = '';
+    s2Schedule.forEach((item) => {
+      const timeStr = `${item.hour}:${item.minute}`;
+      const isEnd = item.title.includes('Darslar yakuni');
+      const isBreak = item.title.includes('Tanaffus');
+      const chipClass = isEnd ? 'preset-chip preset-chip-end' : (isBreak ? 'preset-chip preset-chip-break' : 'preset-chip preset-chip-lesson');
+      const icon = isEnd ? '🏁' : '🎵';
+      let shortLabel = timeStr;
+      if (item.title.includes('Dars boshlanishi')) {
+        const num = item.title.match(/(\d+)-Dars/);
+        shortLabel = `${timeStr} (${num ? num[1] : ''}-dars)`;
+      } else if (item.title.includes('Tanaffus')) {
+        const num = item.title.match(/(\d+)-Tanaffus/);
+        shortLabel = `${timeStr} (${num ? num[1] : ''}-tanaffus)`;
+      } else if (item.title.includes('Katta tanaffus')) {
+        shortLabel = `${timeStr} (Katta tanaffus)`;
+      } else if (isEnd) {
+        shortLabel = `${timeStr} (2-smena yakuni)`;
+      }
+
+      html += `<button type="button" class="${chipClass}" data-time="${timeStr}" data-title="${escapeHtml(item.title)}" data-sound="barkamol">${icon} ${shortLabel}</button>\n`;
+    });
+    html += `<button type="button" class="preset-chip" data-offset="1" data-sound="barkamol">+1 daq (Sinov)</button>\n`;
+    html += `<button type="button" class="preset-chip" data-offset="5" data-sound="barkamol">+5 daq</button>`;
+    rowS2.innerHTML = html;
+  }
 }
 
 /* ==========================================================
@@ -796,7 +1290,14 @@ function triggerAlarm(alarm) {
   if (DOM.ringingClock) DOM.ringingClock.textContent = timeFormatted;
   if (DOM.ringingTitle) DOM.ringingTitle.textContent = alarm.title || "Dars qo'ng'irog'i";
   if (DOM.ringingDescription) {
-    DOM.ringingDescription.textContent = `Rejalashtirilgan vaqt (${timeFormatted}) yetib keldi! Dars yoki tanaffus boshlandi.`;
+    if (alarm.title && (alarm.title.includes('Darslar yakuni') || alarm.title.includes('Oxirgi ohang'))) {
+      const shiftMention = alarm.title.includes('1-smena') ? '1-smena' : (alarm.title.includes('2-smena') ? '2-smena' : '');
+      DOM.ringingDescription.textContent = `🎉 Rejalashtirilgan vaqt (${timeFormatted}) yetib keldi! ${shiftMention} darslari yakunlandi. 1 minutlik "Barkamol avlod" madhiyasi yangramoqda!`;
+    } else if (alarm.title && alarm.title.toLowerCase().includes('tanaffus')) {
+      DOM.ringingDescription.textContent = `☕ Rejalashtirilgan vaqt (${timeFormatted}) yetib keldi! Tanaffus boshlandi. 1 minutlik "Barkamol avlod" qo'shig'i yangramoqda!`;
+    } else {
+      DOM.ringingDescription.textContent = `🔔 Rejalashtirilgan vaqt (${timeFormatted}) yetib keldi! Dars boshlandi. 1 minutlik "Barkamol avlod" qo'shig'i yangramoqda!`;
+    }
   }
   if (DOM.snoozeBtnText) {
     DOM.snoozeBtnText.textContent = `Kechiktirish (+${alarm.snoozeMinutes || 5} daqiqa)`;
@@ -824,7 +1325,7 @@ function triggerAlarm(alarm) {
     STATE.ringingCountdownIntervalId = null;
   }
 
-  // Live countdown ticker (15 -> 0)
+  // Live countdown ticker
   let secondsRemaining = durationSec;
   STATE.ringingCountdownIntervalId = setInterval(() => {
     secondsRemaining--;
@@ -837,7 +1338,7 @@ function triggerAlarm(alarm) {
     }
   }, 1000);
 
-  // Auto-stop bell after at most 15 seconds
+  // Auto-stop bell after duration
   STATE.ringingTimeoutId = setTimeout(() => {
     stopRingingAlarm(true);
   }, durationSec * 1000);
@@ -868,7 +1369,7 @@ function stopRingingAlarm(isAutoStopped = false) {
   if (DOM.ringingModal) DOM.ringingModal.style.display = 'none';
 
   if (isAutoStopped) {
-    showToast("Maktab qo'ng'irog'i 15 soniya jaranglab, avtomatik to'xtatildi", "info");
+    showToast("Qo'ng'iroq / Musiqa yangrab bo'ldi, avtomatik to'xtatildi", "info");
   }
 
   if (STATE.activeRingingAlarm) {
@@ -996,7 +1497,20 @@ function renderAlarmsList() {
     // Calculate duration display and sound badge
     const durSec = parseInt(alarm.durationSeconds, 10) || 60;
     const durLabel = (durSec >= 60) ? `${Math.floor(durSec / 60)} daq` : `${durSec}s`;
-    const soundBadge = (alarm.sound === 'barkamol') ? '🎵 Barkamol avlod' : (alarm.sound === 'qongiroq' ? '🔔 Qo\'ng\'iroq' : '⏱️');
+    let soundBadgeHtml = "";
+    if (alarm.sound === 'barkamol') {
+      const isEnd = alarm.title && (alarm.title.includes('Darslar yakuni') || alarm.title.includes('Oxirgi ohang'));
+      const isBreak = alarm.title && alarm.title.toLowerCase().includes('tanaffus');
+      const badgeText = isEnd
+        ? `🎵 Barkamol avlod (Oxirgi ohang - ${durLabel})`
+        : (isBreak ? `🎵 Barkamol avlod (Tanaffus - ${durLabel})` : `🎵 Barkamol avlod (Dars - ${durLabel})`);
+      soundBadgeHtml = `<span class="alarm-item-duration badge-barkamol" title="Barkamol avlod qo'shig'i, davomiyligi: ${durSec} soniya">${badgeText}</span>`;
+    } else if (alarm.sound === 'qongiroq') {
+      soundBadgeHtml = `<span class="alarm-item-duration badge-qongiroq" title="Maktab qo'ng'irog'i, davomiyligi: ${durSec} soniya">🔔 Qo'ng'iroq (${durLabel})</span>`;
+    } else {
+      const soundBadge = (alarm.sound === 'school') ? '🏫 Zvonok' : (alarm.sound === 'melodic' ? '✨ Melodiya' : '⏱️ Signal');
+      soundBadgeHtml = `<span class="alarm-item-duration" title="Ohang: ${alarm.sound}, davomiyligi: ${durSec} soniya">${soundBadge} (${durLabel})</span>`;
+    }
 
     item.innerHTML = `
       <div class="alarm-item-left">
@@ -1006,7 +1520,7 @@ function renderAlarmsList() {
         </div>
         <div class="alarm-item-info">
           <span class="alarm-item-title">${escapeHtml(alarm.title || "Dars qo'ng'irog'i")}</span>
-          <span class="alarm-item-duration" title="Ohang: ${alarm.sound || 'barkamol'}, davomiyligi: ${durSec} soniya">${soundBadge} (${durLabel})</span>
+          ${soundBadgeHtml}
           <span class="alarm-item-countdown" data-countdown-id="${alarm.id}">${countdownText}</span>
         </div>
       </div>
@@ -1146,7 +1660,7 @@ function setupEventListeners() {
   if (DOM.soundTestQuickBtn) {
     DOM.soundTestQuickBtn.addEventListener('click', () => {
       soundEngine.init();
-      soundEngine.previewSound('qongiroq');
+      soundEngine.previewSound('barkamol');
     });
   }
 
@@ -1182,27 +1696,53 @@ function setupEventListeners() {
     });
   });
 
-  // Quick preset pills (Schedule times or offsets)
-  document.querySelectorAll('.preset-chip[data-time], .preset-chip[data-offset]').forEach(chip => {
-    chip.addEventListener('click', () => {
-      if (chip.dataset.time) {
-        const parts = chip.dataset.time.split(':');
-        if (DOM.alarmHour) DOM.alarmHour.value = parts[0];
-        if (DOM.alarmMinute) DOM.alarmMinute.value = parts[1];
-        if (DOM.alarmSecond) DOM.alarmSecond.value = "00";
-      } else if (chip.dataset.offset) {
-        const offset = parseInt(chip.dataset.offset, 10);
-        setDefaultFormTime(offset);
-      }
+  // Preset shift tab switching (1-smena vs 2-smena)
+  const tabS1 = DOM.tabPresetShift1 || document.getElementById('tabPresetShift1');
+  const tabS2 = DOM.tabPresetShift2 || document.getElementById('tabPresetShift2');
+  const rowS1 = DOM.presetsRowShift1 || document.getElementById('presetsRowShift1');
+  const rowS2 = DOM.presetsRowShift2 || document.getElementById('presetsRowShift2');
 
-      if (chip.dataset.title && DOM.alarmTitle) {
-        DOM.alarmTitle.value = chip.dataset.title;
-      }
-
-      // Flash feedback
-      chip.style.transform = 'scale(0.95)';
-      setTimeout(() => { chip.style.transform = ''; }, 150);
+  if (tabS1 && tabS2) {
+    tabS1.addEventListener('click', () => {
+      tabS1.classList.add('active');
+      tabS2.classList.remove('active');
+      if (rowS1) rowS1.style.display = 'flex';
+      if (rowS2) rowS2.style.display = 'none';
     });
+    tabS2.addEventListener('click', () => {
+      tabS2.classList.add('active');
+      tabS1.classList.remove('active');
+      if (rowS1) rowS1.style.display = 'none';
+      if (rowS2) rowS2.style.display = 'flex';
+    });
+  }
+
+  // Quick preset pills (Schedule times or offsets) - delegated event listener
+  document.addEventListener('click', (e) => {
+    const chip = e.target.closest('.preset-chip[data-time], .preset-chip[data-offset]');
+    if (!chip) return;
+
+    if (chip.dataset.time) {
+      const parts = chip.dataset.time.split(':');
+      if (DOM.alarmHour) DOM.alarmHour.value = parts[0];
+      if (DOM.alarmMinute) DOM.alarmMinute.value = parts[1];
+      if (DOM.alarmSecond) DOM.alarmSecond.value = "00";
+    } else if (chip.dataset.offset) {
+      const offset = parseInt(chip.dataset.offset, 10);
+      setDefaultFormTime(offset);
+    }
+
+    if (chip.dataset.title && DOM.alarmTitle) {
+      DOM.alarmTitle.value = chip.dataset.title;
+    }
+
+    if (chip.dataset.sound && DOM.alarmSound) {
+      DOM.alarmSound.value = chip.dataset.sound;
+    }
+
+    // Flash feedback
+    chip.style.transform = 'scale(0.95)';
+    setTimeout(() => { chip.style.transform = ''; }, 150);
   });
 
   // Quick lesson title chips
@@ -1211,6 +1751,9 @@ function setupEventListeners() {
       if (DOM.alarmTitle) {
         DOM.alarmTitle.value = chip.dataset.title || '';
         DOM.alarmTitle.focus();
+      }
+      if (chip.dataset.sound && DOM.alarmSound) {
+        DOM.alarmSound.value = chip.dataset.sound;
       }
       chip.style.transform = 'scale(0.95)';
       setTimeout(() => { chip.style.transform = ''; }, 150);
@@ -1242,9 +1785,22 @@ function setupEventListeners() {
     }
   });
 
-  // Standard school schedule loader button
+  // Shift schedule load buttons (1-smena, 2-smena, To'liq kun)
+  const s1Btn = DOM.loadShift1Btn || document.getElementById('loadShift1Btn');
+  const s2Btn = DOM.loadShift2Btn || document.getElementById('loadShift2Btn');
+  const allBtn = DOM.loadAllShiftsBtn || document.getElementById('loadAllShiftsBtn');
+
+  if (s1Btn) {
+    s1Btn.addEventListener('click', () => loadSchoolSchedule(1));
+  }
+  if (s2Btn) {
+    s2Btn.addEventListener('click', () => loadSchoolSchedule(2));
+  }
+  if (allBtn) {
+    allBtn.addEventListener('click', () => loadSchoolSchedule('all'));
+  }
   if (DOM.loadStandardScheduleBtn) {
-    DOM.loadStandardScheduleBtn.addEventListener('click', loadStandardSchoolSchedule);
+    DOM.loadStandardScheduleBtn.addEventListener('click', () => loadSchoolSchedule(1));
   }
 
   // Preview / Test Sound Button

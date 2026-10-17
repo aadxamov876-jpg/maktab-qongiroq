@@ -8,11 +8,15 @@ Maktab darslari, tanaffuslari va tadbirlari uchun maxsus yaratilgan zamonaviy, q
 
 ## ✨ Imkoniyatlar
 
-- 🔔 **Haqiqiy Maktab Qo'ng'irog'i (MP3):** Belgilangan dars boshlanishi va tanaffus vaqtlarida jarangdor maktab qo'ng'irog'i chalinadi.
-- 🏫 **Standart dars jadvalini bitta tugma bilan yuklash:** 1-smena uchun barcha 6 ta dars va tanaffus qo'ng'iroqlari avtomatik tarzda jadvalga qo'shiladi.
-- 🏷️ **Tezkor dars nomlari:** "1-Dars boshlanishi", "Tanaffus", "Katta tanaffus", "Darslar yakuni" kabi nomlarni bir marta bosish orqali kiritish.
-- ⏱️ **Maksimal 15 soniyalik xavfsiz jaranglash:** Qo'ng'iroq 15 soniyadan oshmasdan chalinadi, jonli progress-bar va avtomatik to'xtash taymeri bilan jihozlangan.
+- 🎵 **Barcha qo'ng'iroqlarda 1 minutlik "Barkamol avlod" (MP3):** Barcha dars boshlanishi, tanaffuslar hamda smenalar yakunida (12:55 va 18:05) 1 daqiqalik Ozodbek Nazarbekovning "Barkamol avlod" qo'shig'i yangraydi.
+- 🏫 **Standart 1-smena dars jadvali:** Barcha 6 ta dars va tanaffuslar (08:00 — 12:55). Barchasida **"Barkamol avlod" (MP3)** 1 daqiqa yangraydi.
+- 🏢 **Standart 2-smena dars jadvali:** Barcha 6 ta dars va tanaffuslar (13:10 — 18:05). Barchasida **"Barkamol avlod" (MP3)** 1 daqiqa yangraydi.
+- ⚙️ **Standart 1- va 2-smena vaqtlarini qo'lda sozlash:** Darslarning boshlanish vaqti (soat va daqiqa), darslar soni (4 tadan 8 tagacha), dars davomiyligi (20–90 daqiqa), oddiy tanaffus (2–30 daqiqa) va 3-darsdan keyingi katta tanaffuslarni erkin sozlash va `localStorage`da saqlash imkoniyati.
+- 🌟 **Ikkala smenani to'liq yuklash:** 1- va 2-smena darslarini birgalikda to'liq kunlik avtomat qo'ng'iroq tizimi sifatida yuklash (24 ta qo'ng'iroq, hammasi "Barkamol avlod").
+- 🏷️ **Tezkor dars nomlari va vaqtlari:** 1- va 2-smena vaqtlari bo'yicha qulay tezkor tanlov tugmalari.
+- ⏱️ **Xavfsiz jaranglash:** Qo'ng'iroq 60 soniyagacha chalinadi, jonli progress-bar va avtomatik to'xtash taymeri bilan jihozlangan.
 - 🎵 **Turli ohang tanlovlari:**
+  - 🎵 Ozodbek Nazarbekov - Barkamol avlod (MP3)
   - 🔔 Qongiroq (Maktabning haqiqiy qo'ng'irog'i MP3)
   - 🏫 Maktab Qo'ng'irog'i (Elektr Zvonok)
   - ✨ Chiroyli Melodiya (Arpeggio)

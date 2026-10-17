@@ -87,29 +87,165 @@
             <span class="card-subtitle">Dars boshlanishi yoki tanaffus uchun aniq vaqtni belgilang</span>
           </div>
 
-          <!-- Quick loader for standard school timetable with Break Duration Toggle -->
+          <!-- Quick loader for standard school timetable with Shift Selector & Break Duration Toggle -->
           <div class="schedule-quick-loader">
-            <div class="break-duration-selector">
-              <div class="break-selector-header">
-                <span class="break-selector-title">🥪 Katta tanaffus (3-darsdan so'ng):</span>
-                <span class="break-current-badge" id="currentBreakBadge">10 daqiqa</span>
-              </div>
-              <div class="break-toggle-group" role="group" aria-label="Katta tanaffus davomiyligi">
-                <button type="button" class="btn-break-opt active" data-break="10" id="break10Btn" onclick="handleBreakToggle(10)" title="3-darsdan keyin 10 daqiqa katta tanaffus">
-                  ⏳ 10 daqiqa (Standart)
-                </button>
-                <button type="button" class="btn-break-opt" data-break="5" id="break5Btn" onclick="handleBreakToggle(5)" title="Katta tanaffusni 5 daqiqaga qisqartirish">
-                  ⚡ 5 daqiqa (Qisqartirilgan)
-                </button>
-              </div>
-              <div class="break-time-hint" id="breakTimeHint">
-                📌 3-dars (10:25) ➔ 10 daq tanaffus ➔ 4-dars (10:35) ➔ 6-dars yakuni: 13:00
+            <div class="loader-header-row">
+              <span class="loader-header-title">⚡ Standart maktab dars jadvallari:</span>
+              <span class="loader-sound-badge" title="Barcha qo'ng'iroqlarda 1 minutlik 'Barkamol avlod' qo'shig'i yangraydi">🎵 Hammasi: 1 daqiqa Barkamol avlod</span>
+            </div>
+
+            <!-- Shift selector buttons -->
+            <div class="shift-buttons-grid">
+              <button type="button" class="btn-shift-load shift-1 active" id="loadShift1Btn" title="1-smena uchun dars va tanaffus jadvalini yuklash">
+                <span class="shift-icon">🏫</span>
+                <div class="shift-info">
+                  <span class="shift-title">1-smena jadvali</span>
+                  <span class="shift-time" id="shift1ButtonTimeLabel">08:00 — 12:55 (Hammasi: 1 daq Barkamol avlod)</span>
+                </div>
+              </button>
+
+              <button type="button" class="btn-shift-load shift-2" id="loadShift2Btn" title="2-smena uchun dars va tanaffus jadvalini yuklash">
+                <span class="shift-icon">🏢</span>
+                <div class="shift-info">
+                  <span class="shift-title">2-smena jadvali</span>
+                  <span class="shift-time" id="shift2ButtonTimeLabel">13:10 — 18:05 (Hammasi: 1 daq Barkamol avlod)</span>
+                </div>
+              </button>
+
+              <button type="button" class="btn-shift-load btn-shift-all" id="loadAllShiftsBtn" title="1- va 2-smena to'liq kunlik jadvalni yuklash">
+                <span class="shift-icon">🌟</span>
+                <div class="shift-info">
+                  <span class="shift-title">Ikkala smena (To'liq kun)</span>
+                  <span class="shift-time" id="allShiftsButtonTimeLabel">08:00 — 18:05 (Barchasida 1 daq Barkamol avlod)</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- Manual Shift Customizer (Smena vaqtlarini qo'lda sozlash) -->
+            <div class="shift-customizer-container">
+              <button type="button" class="btn-toggle-shift-settings" id="toggleShiftSettingsBtn" title="1- va 2-smena boshlanish vaqti, dars davomiyligi va tanaffuslarni qo'lda sozlash">
+                <span class="btn-gear-icon">⚙️</span>
+                <span class="btn-gear-text">Standart smena vaqtlarini qo'lda sozlash</span>
+                <span class="btn-gear-badge" id="shiftSettingsStatusBadge">Moslashuvchan</span>
+                <span class="btn-gear-arrow" id="shiftSettingsArrow">▼</span>
+              </button>
+
+              <div class="shift-settings-panel" id="shiftSettingsPanel" style="display: none;">
+                <div class="shift-settings-tabs">
+                  <button type="button" class="shift-settings-tab active" id="tabShiftCfg1" data-cfgshift="1">🏫 1-smena vaqtlari</button>
+                  <button type="button" class="shift-settings-tab" id="tabShiftCfg2" data-cfgshift="2">🏢 2-smena vaqtlari</button>
+                </div>
+
+                <!-- 1-smena config form -->
+                <div class="shift-config-form" id="shiftConfigForm1">
+                  <div class="config-grid">
+                    <div class="config-item">
+                      <label class="config-label" for="cfgS1Start">Boshlanish vaqti:</label>
+                      <input type="time" id="cfgS1Start" value="08:00" class="config-input config-time">
+                    </div>
+                    <div class="config-item">
+                      <label class="config-label" for="cfgS1Lessons">Darslar soni:</label>
+                      <select id="cfgS1Lessons" class="config-select">
+                        <option value="4">4 ta dars</option>
+                        <option value="5">5 ta dars</option>
+                        <option value="6" selected>6 ta dars (Standart)</option>
+                        <option value="7">7 ta dars</option>
+                        <option value="8">8 ta dars</option>
+                      </select>
+                    </div>
+                    <div class="config-item">
+                      <label class="config-label" for="cfgS1Duration">Dars davomiyligi (daq):</label>
+                      <input type="number" id="cfgS1Duration" value="45" min="20" max="90" class="config-input">
+                    </div>
+                    <div class="config-item">
+                      <label class="config-label" for="cfgS1Break">Oddiy tanaffus (daq):</label>
+                      <input type="number" id="cfgS1Break" value="5" min="2" max="30" class="config-input">
+                    </div>
+                    <div class="config-item full-width">
+                      <label class="config-label" for="cfgS1BigBreak">3-darsdan so'ng katta tanaffus (daq):</label>
+                      <select id="cfgS1BigBreak" class="config-select">
+                        <option value="5" selected>5 daqiqa (Standart: 12:55 yakun)</option>
+                        <option value="10">10 daqiqa (13:00 yakun)</option>
+                        <option value="15">15 daqiqa (13:05 yakun)</option>
+                        <option value="20">20 daqiqa (13:10 yakun)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="config-preview-badge" id="cfgS1Preview">
+                    📊 Hisoblangan: <b>08:00 — 12:55</b> (6 ta dars, barchasida 1 daq Barkamol avlod)
+                  </div>
+                </div>
+
+                <!-- 2-smena config form -->
+                <div class="shift-config-form" id="shiftConfigForm2" style="display: none;">
+                  <div class="config-grid">
+                    <div class="config-item">
+                      <label class="config-label" for="cfgS2Start">Boshlanish vaqti:</label>
+                      <input type="time" id="cfgS2Start" value="13:10" class="config-input config-time">
+                    </div>
+                    <div class="config-item">
+                      <label class="config-label" for="cfgS2Lessons">Darslar soni:</label>
+                      <select id="cfgS2Lessons" class="config-select">
+                        <option value="4">4 ta dars</option>
+                        <option value="5">5 ta dars</option>
+                        <option value="6" selected>6 ta dars (Standart)</option>
+                        <option value="7">7 ta dars</option>
+                        <option value="8">8 ta dars</option>
+                      </select>
+                    </div>
+                    <div class="config-item">
+                      <label class="config-label" for="cfgS2Duration">Dars davomiyligi (daq):</label>
+                      <input type="number" id="cfgS2Duration" value="45" min="20" max="90" class="config-input">
+                    </div>
+                    <div class="config-item">
+                      <label class="config-label" for="cfgS2Break">Oddiy tanaffus (daq):</label>
+                      <input type="number" id="cfgS2Break" value="5" min="2" max="30" class="config-input">
+                    </div>
+                    <div class="config-item full-width">
+                      <label class="config-label" for="cfgS2BigBreak">3-darsdan so'ng katta tanaffus (daq):</label>
+                      <select id="cfgS2BigBreak" class="config-select">
+                        <option value="5" selected>5 daqiqa (Standart: 18:05 yakun)</option>
+                        <option value="10">10 daqiqa (18:10 yakun)</option>
+                        <option value="15">15 daqiqa (18:15 yakun)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="config-preview-badge" id="cfgS2Preview">
+                    📊 Hisoblangan: <b>13:10 — 18:05</b> (6 ta dars, barchasida 1 daq Barkamol avlod)
+                  </div>
+                </div>
+
+                <!-- Config Actions -->
+                <div class="config-actions">
+                  <button type="button" class="btn btn-primary btn-save-shift-cfg" id="saveShiftConfigBtn">
+                    <span>💾</span> Sozlamalarni saqlash va jadvalni qo'llash
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-reset-shift-cfg" id="resetShiftConfigBtn">
+                    <span>🔄</span> Standartga qaytarish
+                  </button>
+                </div>
               </div>
             </div>
 
-            <button type="button" class="btn btn-schedule-load" id="loadStandardScheduleBtn" title="1-smena uchun barcha 6 ta dars va tanaffus qo'ng'iroqlarini bitta tugma bilan yuklash">
-              <span class="btn-icon-inside">🏫</span> Standart dars jadvalini yuklash (1-smena)
-            </button>
+            <!-- Break Duration Toggle for 1-smena -->
+            <div class="break-duration-selector" id="breakDurationWrap">
+              <div class="break-selector-header">
+                <span class="break-selector-title">🥪 1-smena tanaffus tartibi:</span>
+                <span class="break-current-badge" id="currentBreakBadge">5 daqiqa (12:55 da tugash)</span>
+              </div>
+              <div class="break-toggle-group" role="group" aria-label="1-smena tanaffus davomiyligi">
+                <button type="button" class="btn-break-opt active" data-break="5" id="break5Btn" onclick="handleBreakToggle(5)" title="Barcha tanaffuslar 5 daqiqa: 12:55 da darslar tugaydi va 1 minutlik Barkamol avlod yangraydi">
+                  ⚡ 5 daqiqa (Standart: 12:55 tugash)
+                </button>
+                <button type="button" class="btn-break-opt" data-break="10" id="break10Btn" onclick="handleBreakToggle(10)" title="3-darsdan keyin 10 daqiqa katta tanaffus (13:00 da darslar tugaydi)">
+                  ⏳ 10 daqiqa (Katta tanaffus bilan: 13:00)
+                </button>
+              </div>
+            </div>
+
+            <div class="break-time-hint" id="breakTimeHint">
+              📌 <b>1-smena:</b> 08:00 ➔ 6 ta dars ➔ Barcha dars va tanaffuslarda <b>1 minutlik "Barkamol avlod"</b> qo'shig'i yangraydi!
+            </div>
           </div>
 
           <form id="alarmForm" class="alarm-form">
@@ -153,22 +289,50 @@
               </div>
             </div>
 
-            <!-- Quick Add Pill Buttons -->
+            <!-- Quick Add Pill Buttons with 1-smena and 2-smena tabs -->
             <div class="quick-presets">
-              <span class="presets-label">Dars vaqtlari bo'yicha tezkor o'rnatish:</span>
-              <div class="presets-row" id="presetsRow">
-                <button type="button" class="preset-chip" data-time="08:00" data-title="1-Dars boshlanishi">08:00 (1-dars)</button>
-                <button type="button" class="preset-chip" data-time="08:45" data-title="1-Tanaffus (Dars tugashi)">08:45 (1-tanaffus)</button>
-                <button type="button" class="preset-chip" data-time="08:50" data-title="2-Dars boshlanishi">08:50 (2-dars)</button>
-                <button type="button" class="preset-chip" data-time="09:35" data-title="2-Tanaffus (Dars tugashi)">09:35 (2-tanaffus)</button>
-                <button type="button" class="preset-chip" data-time="09:40" data-title="3-Dars boshlanishi">09:40 (3-dars)</button>
-                <button type="button" class="preset-chip" data-time="10:25" data-title="Katta tanaffus (3-dars yakuni)">10:25 (Katta tanaffus)</button>
-                <button type="button" class="preset-chip" data-time="10:30" data-title="4-Dars boshlanishi" id="presetChipL4">10:30 (4-dars)</button>
-                <button type="button" class="preset-chip" data-time="11:15" data-title="4-Tanaffus (Dars tugashi)" id="presetChipB4">11:15 (4-tanaffus)</button>
-                <button type="button" class="preset-chip" data-time="11:20" data-title="5-Dars boshlanishi" id="presetChipL5">11:20 (5-dars)</button>
-                <button type="button" class="preset-chip" data-time="12:55" data-title="Darslar yakuni (Katta qo'ng'iroq)" id="presetChipEnd">12:55 (Dars yakuni)</button>
-                <button type="button" class="preset-chip" data-offset="1">+1 daq (Sinov)</button>
-                <button type="button" class="preset-chip" data-offset="5">+5 daq</button>
+              <div class="presets-header">
+                <span class="presets-label">Dars vaqtlari bo'yicha tezkor o'rnatish (Barkamol avlod):</span>
+                <div class="shift-preset-tabs">
+                  <button type="button" class="preset-tab-btn active" id="tabPresetShift1">1-smena</button>
+                  <button type="button" class="preset-tab-btn" id="tabPresetShift2">2-smena</button>
+                </div>
+              </div>
+
+              <!-- 1-smena presets (Hammasi Barkamol avlod) -->
+              <div class="presets-row" id="presetsRowShift1">
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="08:00" data-title="1-smena: 1-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 08:00 (1-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="08:45" data-title="1-smena: 1-Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 08:45 (1-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="08:50" data-title="1-smena: 2-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 08:50 (2-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="09:35" data-title="1-smena: 2-Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 09:35 (2-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="09:40" data-title="1-smena: 3-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 09:40 (3-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="10:25" data-title="1-smena: 3-Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 10:25 (3-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="10:30" data-title="1-smena: 4-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol" id="presetChipL4">🎵 10:30 (4-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="11:15" data-title="1-smena: 4-Tanaffus (Barkamol avlod)" data-sound="barkamol" id="presetChipB4">🎵 11:15 (4-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="11:20" data-title="1-smena: 5-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol" id="presetChipL5">🎵 11:20 (5-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="12:05" data-title="1-smena: 5-Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 12:05 (5-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="12:10" data-title="1-smena: 6-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 12:10 (6-dars)</button>
+                <button type="button" class="preset-chip preset-chip-end" data-time="12:55" data-title="1-smena: Darslar yakuni (Oxirgi ohang - Barkamol avlod)" data-sound="barkamol" id="presetChipEnd">🏁 12:55 (1-smena yakuni)</button>
+                <button type="button" class="preset-chip" data-offset="1" data-sound="barkamol">+1 daq (Sinov)</button>
+                <button type="button" class="preset-chip" data-offset="5" data-sound="barkamol">+5 daq</button>
+              </div>
+
+              <!-- 2-smena presets (Hammasi Barkamol avlod) -->
+              <div class="presets-row" id="presetsRowShift2" style="display: none;">
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="13:10" data-title="2-smena: 1-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 13:10 (1-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="13:55" data-title="2-smena: 1-Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 13:55 (1-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="14:00" data-title="2-smena: 2-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 14:00 (2-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="14:45" data-title="2-smena: 2-Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 14:45 (2-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="14:50" data-title="2-smena: 3-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 14:50 (3-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="15:35" data-title="2-smena: 3-Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 15:35 (3-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="15:40" data-title="2-smena: 4-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 15:40 (4-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="16:25" data-title="2-smena: 4-Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 16:25 (4-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="16:30" data-title="2-smena: 5-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 16:30 (5-dars)</button>
+                <button type="button" class="preset-chip preset-chip-break" data-time="17:15" data-title="2-smena: 5-Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 17:15 (5-tanaffus)</button>
+                <button type="button" class="preset-chip preset-chip-lesson" data-time="17:20" data-title="2-smena: 6-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 17:20 (6-dars)</button>
+                <button type="button" class="preset-chip preset-chip-end" data-time="18:05" data-title="2-smena: Darslar yakuni (Oxirgi ohang - Barkamol avlod)" data-sound="barkamol">🏁 18:05 (2-smena yakuni)</button>
+                <button type="button" class="preset-chip" data-offset="1" data-sound="barkamol">+1 daq (Sinov)</button>
+                <button type="button" class="preset-chip" data-offset="5" data-sound="barkamol">+5 daq</button>
               </div>
             </div>
 
@@ -180,19 +344,19 @@
                 <input type="text" id="alarmTitle" placeholder="Masalan: 1-Dars boshlanishi, Katta tanaffus..." maxlength="50">
               </div>
 
-              <!-- Quick Lesson Title Chips -->
+              <!-- Quick Lesson Title Chips (Barchasi Barkamol avlod) -->
               <div class="quick-title-chips">
-                <span class="title-chips-label">Tezkor tanlash:</span>
+                <span class="title-chips-label">Tezkor tanlash (Barkamol avlod):</span>
                 <div class="title-chips-row">
-                  <button type="button" class="title-chip" data-title="1-Dars boshlanishi">🔔 1-Dars</button>
-                  <button type="button" class="title-chip" data-title="Tanaffus (Dars tugashi)">☕ Tanaffus</button>
-                  <button type="button" class="title-chip" data-title="2-Dars boshlanishi">🔔 2-Dars</button>
-                  <button type="button" class="title-chip" data-title="Katta tanaffus">🥪 Katta tanaffus</button>
-                  <button type="button" class="title-chip" data-title="3-Dars boshlanishi">🔔 3-Dars</button>
-                  <button type="button" class="title-chip" data-title="4-Dars boshlanishi">🔔 4-Dars</button>
-                  <button type="button" class="title-chip" data-title="5-Dars boshlanishi">🔔 5-Dars</button>
-                  <button type="button" class="title-chip" data-title="6-Dars boshlanishi">🔔 6-Dars</button>
-                  <button type="button" class="title-chip" data-title="Darslar yakuni (Katta qo'ng'iroq)">🏁 Darslar yakuni</button>
+                  <button type="button" class="title-chip" data-title="1-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 1-Dars</button>
+                  <button type="button" class="title-chip" data-title="Tanaffus (Barkamol avlod)" data-sound="barkamol">🎵 Tanaffus</button>
+                  <button type="button" class="title-chip" data-title="2-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 2-Dars</button>
+                  <button type="button" class="title-chip" data-title="3-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 3-Dars</button>
+                  <button type="button" class="title-chip" data-title="4-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 4-Dars</button>
+                  <button type="button" class="title-chip" data-title="5-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 5-Dars</button>
+                  <button type="button" class="title-chip" data-title="6-Dars boshlanishi (Barkamol avlod)" data-sound="barkamol">🎵 6-Dars</button>
+                  <button type="button" class="title-chip title-chip-special" data-title="1-smena: Darslar yakuni (Oxirgi ohang - Barkamol avlod)" data-sound="barkamol">🏁 1-smena yakuni (12:55)</button>
+                  <button type="button" class="title-chip title-chip-special" data-title="2-smena: Darslar yakuni (Oxirgi ohang - Barkamol avlod)" data-sound="barkamol">🏁 2-smena yakuni (18:05)</button>
                 </div>
               </div>
             </div>
@@ -389,14 +553,14 @@
       <h3 class="ringing-title" id="ringingTitle">Dars qo'ng'irog'i</h3>
       <p class="ringing-desc" id="ringingDescription">Dars yoki tanaffus vaqti yetib keldi!</p>
 
-      <!-- Auto-stop countdown (max 15s) -->
+      <!-- Auto-stop countdown (max 60s) -->
       <div class="ringing-autostop-wrap" id="ringingAutoStopWrap">
         <div class="ringing-autostop-bar">
           <div class="ringing-autostop-progress" id="ringingProgressBar"></div>
         </div>
         <div class="ringing-autostop-text">
           <span>⏱️ Avtomatik to'xtashga:</span>
-          <strong id="ringingSecondsLeft">15</strong> soniya
+          <strong id="ringingSecondsLeft">60</strong> soniya
         </div>
       </div>
 
