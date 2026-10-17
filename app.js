@@ -13,6 +13,70 @@
  * - Sport mashg'ulotlari va musobaqalar uchun sekundomer
  */
 
+
+/* ==========================================================
+   SECURITY HELPERS (input validation / sanitisation)
+   ========================================================== */
+// Frame-busting: GitHub Pages cannot send X-Frame-Options / frame-ancestors headers
+if (window.top !== window.self) {
+  try { document.documentElement.style.display = 'none'; } catch (e) { }
+  try { window.top.location = window.self.location; } catch (e) { }
+}
+
+const MAX_ALARMS = 200;
+const MAX_TITLE_LENGTH = 50;
+const ALLOWED_SOUNDS = ['barkamol', 'qongiroq', 'school', 'melodic', 'siren', 'gentle', 'classic', 'retro'];
+const SHIFT_LIMITS = {
+  lessons: [4, 8, 6],
+  duration: [20, 90, 45],
+  breakDur: [2, 30, 5],
+  bigBreak: [2, 30, 5]
+};
+
+function clampInt(value, min, max, fallback) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(n, min), max);
+}
+
+function cleanText(value, maxLen, fallback = '') {
+  if (typeof value !== 'string') return fallback;
+  // strip control characters, collapse whitespace, cap length
+  const t = value.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, maxLen);
+  return t || fallback;
+}
+
+function sanitizeShiftCfg(raw, defaults) {
+  const r = (raw && typeof raw === 'object') ? raw : {};
+  return {
+    startH: clampInt(r.startH, 0, 23, defaults.startH),
+    startM: clampInt(r.startM, 0, 59, defaults.startM),
+    lessons: clampInt(r.lessons, SHIFT_LIMITS.lessons[0], SHIFT_LIMITS.lessons[1], defaults.lessons),
+    duration: clampInt(r.duration, SHIFT_LIMITS.duration[0], SHIFT_LIMITS.duration[1], defaults.duration),
+    breakDur: clampInt(r.breakDur, SHIFT_LIMITS.breakDur[0], SHIFT_LIMITS.breakDur[1], defaults.breakDur),
+    bigBreak: clampInt(r.bigBreak, SHIFT_LIMITS.bigBreak[0], SHIFT_LIMITS.bigBreak[1], defaults.bigBreak)
+  };
+}
+
+// Validate one bell object coming from localStorage (untrusted input)
+function sanitizeAlarm(raw, index) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const id = (typeof raw.id === 'string' && /^[A-Za-z0-9_\-]{1,64}$/.test(raw.id))
+    ? raw.id : `bell_restored_${Date.now()}_${index}`;
+  return {
+    id,
+    hour: String(clampInt(raw.hour, 0, 23, 0)).padStart(2, '0'),
+    minute: String(clampInt(raw.minute, 0, 59, 0)).padStart(2, '0'),
+    second: String(clampInt(raw.second, 0, 59, 0)).padStart(2, '0'),
+    title: cleanText(raw.title, MAX_TITLE_LENGTH, "Dars qo'ng'irog'i"),
+    sound: ALLOWED_SOUNDS.includes(raw.sound) ? raw.sound : 'barkamol',
+    snoozeMinutes: clampInt(raw.snoozeMinutes, 1, 60, 5),
+    durationSeconds: clampInt(raw.durationSeconds, 1, 60, 60),
+    enabled: raw.enabled !== false,
+    createdAt: Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : Date.now()
+  };
+}
+
 // Standart va sozlanuvchi smena parametrlari (1- va 2-smena)
 const DEFAULT_SHIFT_SETTINGS = {
   s1: { startH: 8, startM: 0, lessons: 6, duration: 45, breakDur: 5, bigBreak: 5 },
@@ -25,8 +89,8 @@ function loadStoredShiftSettings() {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        s1: { ...DEFAULT_SHIFT_SETTINGS.s1, ...(parsed.s1 || {}) },
-        s2: { ...DEFAULT_SHIFT_SETTINGS.s2, ...(parsed.s2 || {}) }
+        s1: sanitizeShiftCfg(parsed && parsed.s1, DEFAULT_SHIFT_SETTINGS.s1),
+        s2: sanitizeShiftCfg(parsed && parsed.s2, DEFAULT_SHIFT_SETTINGS.s2)
       };
     }
   } catch (e) {
@@ -38,7 +102,7 @@ function loadStoredShiftSettings() {
 // State Management
 const STATE = {
   is24Hour: true,
-  bigBreakDuration: parseInt(localStorage.getItem('smart_qongiroq_big_break') || '5', 10),
+  bigBreakDuration: (parseInt(localStorage.getItem('smart_qongiroq_big_break') || '5', 10) === 10) ? 10 : 5,
   shiftSettings: loadStoredShiftSettings(),
   alarms: [],
   activeRingingAlarm: null,
@@ -136,7 +200,13 @@ function calculateSchoolSchedule(options = {}) {
   } = options;
 
   const schedule = [];
-  let currentTotalMinutes = startHour * 60 + startMinute;
+  // Defensive clamping: prevents huge loops / nonsense times from tampered data
+  const safeLessons = clampInt(totalLessons, SHIFT_LIMITS.lessons[0], SHIFT_LIMITS.lessons[1], 6);
+  const safeDuration = clampInt(lessonDuration, SHIFT_LIMITS.duration[0], SHIFT_LIMITS.duration[1], 45);
+  const safeBreak = clampInt(breakDuration, SHIFT_LIMITS.breakDur[0], SHIFT_LIMITS.breakDur[1], 5);
+  const safeLongBreak = clampInt(longBreakDuration, SHIFT_LIMITS.bigBreak[0], SHIFT_LIMITS.bigBreak[1], 5);
+  const safeShift = (shift === 2) ? 2 : 1;
+  let currentTotalMinutes = clampInt(startHour, 0, 23, 8) * 60 + clampInt(startMinute, 0, 59, 0);
 
   const formatTime = (totalMin) => {
     const h = Math.floor(totalMin / 60) % 24;
@@ -148,9 +218,9 @@ function calculateSchoolSchedule(options = {}) {
     };
   };
 
-  const shiftLabel = `${shift}-smena: `;
+  const shiftLabel = `${safeShift}-smena: `;
 
-  for (let lesson = 1; lesson <= totalLessons; lesson++) {
+  for (let lesson = 1; lesson <= safeLessons; lesson++) {
     // Dars boshlanishi (1 minutlik Barkamol avlod qo'shig'i)
     const startTime = formatTime(currentTotalMinutes);
     schedule.push({
@@ -160,16 +230,16 @@ function calculateSchoolSchedule(options = {}) {
       title: `${shiftLabel}${lesson}-Dars boshlanishi (Barkamol avlod - 1 daq)`,
       sound: 'barkamol', // 1 minutlik Barkamol avlod qo'shig'i!
       durationSeconds: 60,
-      shift: shift
+      shift: safeShift
     });
 
     // Dars tugashi
-    currentTotalMinutes += lessonDuration;
+    currentTotalMinutes += safeDuration;
     const endTime = formatTime(currentTotalMinutes);
 
-    const currBreakDur = getBreakDuration(lesson, totalLessons, longBreakDuration, shift, breakDuration);
+    const currBreakDur = getBreakDuration(lesson, safeLessons, safeLongBreak, safeShift, safeBreak);
 
-    if (lesson === totalLessons) {
+    if (lesson === safeLessons) {
       // Darslar yakuni (Oxirgi ohang: 1 minutlik Barkamol avlod!)
       schedule.push({
         hour: endTime.hour,
@@ -178,9 +248,9 @@ function calculateSchoolSchedule(options = {}) {
         title: `${shiftLabel}Darslar yakuni (Oxirgi ohang - Barkamol avlod)`,
         sound: 'barkamol', // 1 minutlik Ozodbek Nazarbekov - Barkamol avlod!
         durationSeconds: 60,
-        shift: shift
+        shift: safeShift
       });
-    } else if (lesson === 3 && currBreakDur > breakDuration) {
+    } else if (lesson === 3 && currBreakDur > safeBreak) {
       // Katta tanaffus (1 minutlik Barkamol avlod)
       schedule.push({
         hour: endTime.hour,
@@ -189,7 +259,7 @@ function calculateSchoolSchedule(options = {}) {
         title: `${shiftLabel}Katta tanaffus (${currBreakDur} daq - Barkamol avlod)`,
         sound: 'barkamol', // 1 minutlik Barkamol avlod qo'shig'i!
         durationSeconds: 60,
-        shift: shift
+        shift: safeShift
       });
       currentTotalMinutes += currBreakDur;
     } else {
@@ -201,7 +271,7 @@ function calculateSchoolSchedule(options = {}) {
         title: `${shiftLabel}${lesson}-Tanaffus (Barkamol avlod - 1 daq)`,
         sound: 'barkamol', // 1 minutlik Barkamol avlod qo'shig'i!
         durationSeconds: 60,
-        shift: shift
+        shift: safeShift
       });
       currentTotalMinutes += currBreakDur;
     }
@@ -217,13 +287,14 @@ function getStandardSchoolSchedule(shift = 1) {
     ? STATE.shiftSettings[sKey]
     : DEFAULT_SHIFT_SETTINGS[sKey];
 
+  const c = sanitizeShiftCfg(cfg, DEFAULT_SHIFT_SETTINGS[sKey]);
   return calculateSchoolSchedule({
-    startHour: parseInt(cfg.startH, 10),
-    startMinute: parseInt(cfg.startM, 10),
-    totalLessons: parseInt(cfg.lessons, 10) || 6,
-    lessonDuration: parseInt(cfg.duration, 10) || 45,
-    breakDuration: parseInt(cfg.breakDur, 10) || 5,
-    longBreakDuration: parseInt(cfg.bigBreak, 10) || parseInt(cfg.breakDur, 10) || 5,
+    startHour: c.startH,
+    startMinute: c.startM,
+    totalLessons: c.lessons,
+    lessonDuration: c.duration,
+    breakDuration: c.breakDur,
+    longBreakDuration: c.bigBreak,
     shift: shift
   });
 }
@@ -648,11 +719,11 @@ function initApp() {
  * @param {number} duration - 10 yoki 5 daqiqa
  */
 function setBigBreakDuration(duration) {
-  duration = parseInt(duration, 10) || 5;
+  duration = (parseInt(duration, 10) === 10) ? 10 : 5;
   STATE.bigBreakDuration = duration;
   try {
     localStorage.setItem('smart_qongiroq_big_break', String(duration));
-  } catch (e) {}
+  } catch (e) { }
 
   // Update UI toggle buttons
   const b10 = DOM.break10Btn || document.getElementById('break10Btn');
@@ -713,7 +784,7 @@ function setBigBreakDuration(duration) {
 }
 
 // Global click handler for break toggle buttons (accessible via inline onclick and JS)
-window.handleBreakToggle = function(duration) {
+window.handleBreakToggle = function (duration) {
   duration = parseInt(duration, 10) || 5;
   setBigBreakDuration(duration);
   if (duration === 5) {
@@ -745,7 +816,12 @@ function loadAlarms() {
     }
 
     if (saved) {
-      STATE.alarms = JSON.parse(saved);
+      const parsedAlarms = JSON.parse(saved);
+      const list = Array.isArray(parsedAlarms) ? parsedAlarms.slice(0, MAX_ALARMS) : [];
+      const seenIds = new Set();
+      STATE.alarms = list
+        .map((a, i) => sanitizeAlarm(a, i))
+        .filter(a => a && !seenIds.has(a.id) && seenIds.add(a.id));
       // Standart bo'yicha HAMMASI 1 minutlik Barkamol avlod qo'shig'i bo'lishi ta'minlanadi
       STATE.alarms.forEach(a => {
         a.sound = 'barkamol';
@@ -982,10 +1058,10 @@ function updateShiftCustomizerPreviews() {
 
   if (s1Start && preview1) {
     const t1 = parseTimeInput(s1Start.value, 8, 0);
-    const lessons1 = parseInt(s1Lessons ? s1Lessons.value : 6, 10) || 6;
-    const dur1 = parseInt(s1Duration ? s1Duration.value : 45, 10) || 45;
-    const brk1 = parseInt(s1Break ? s1Break.value : 5, 10) || 5;
-    const bigBrk1 = parseInt(s1BigBreak ? s1BigBreak.value : 5, 10) || 5;
+    const lessons1 = clampInt(s1Lessons ? s1Lessons.value : 6, SHIFT_LIMITS.lessons[0], SHIFT_LIMITS.lessons[1], 6);
+    const dur1 = clampInt(s1Duration ? s1Duration.value : 45, SHIFT_LIMITS.duration[0], SHIFT_LIMITS.duration[1], 45);
+    const brk1 = clampInt(s1Break ? s1Break.value : 5, SHIFT_LIMITS.breakDur[0], SHIFT_LIMITS.breakDur[1], 5);
+    const bigBrk1 = clampInt(s1BigBreak ? s1BigBreak.value : 5, SHIFT_LIMITS.bigBreak[0], SHIFT_LIMITS.bigBreak[1], 5);
 
     const tempSched1 = calculateSchoolSchedule({
       startHour: t1.h,
@@ -1004,10 +1080,10 @@ function updateShiftCustomizerPreviews() {
 
   if (s2Start && preview2) {
     const t2 = parseTimeInput(s2Start.value, 13, 10);
-    const lessons2 = parseInt(s2Lessons ? s2Lessons.value : 6, 10) || 6;
-    const dur2 = parseInt(s2Duration ? s2Duration.value : 45, 10) || 45;
-    const brk2 = parseInt(s2Break ? s2Break.value : 5, 10) || 5;
-    const bigBrk2 = parseInt(s2BigBreak ? s2BigBreak.value : 5, 10) || 5;
+    const lessons2 = clampInt(s2Lessons ? s2Lessons.value : 6, SHIFT_LIMITS.lessons[0], SHIFT_LIMITS.lessons[1], 6);
+    const dur2 = clampInt(s2Duration ? s2Duration.value : 45, SHIFT_LIMITS.duration[0], SHIFT_LIMITS.duration[1], 45);
+    const brk2 = clampInt(s2Break ? s2Break.value : 5, SHIFT_LIMITS.breakDur[0], SHIFT_LIMITS.breakDur[1], 5);
+    const bigBrk2 = clampInt(s2BigBreak ? s2BigBreak.value : 5, SHIFT_LIMITS.bigBreak[0], SHIFT_LIMITS.bigBreak[1], 5);
 
     const tempSched2 = calculateSchoolSchedule({
       startHour: t2.h,
@@ -1042,22 +1118,20 @@ function saveCustomShiftSettings() {
   const t2 = parseTimeInput(s2Start ? s2Start.value : '13:10', 13, 10);
 
   STATE.shiftSettings = {
-    s1: {
-      startH: t1.h,
-      startM: t1.m,
-      lessons: parseInt(s1Lessons ? s1Lessons.value : 6, 10) || 6,
-      duration: parseInt(s1Duration ? s1Duration.value : 45, 10) || 45,
-      breakDur: parseInt(s1Break ? s1Break.value : 5, 10) || 5,
-      bigBreak: parseInt(s1BigBreak ? s1BigBreak.value : 5, 10) || 5
-    },
-    s2: {
-      startH: t2.h,
-      startM: t2.m,
-      lessons: parseInt(s2Lessons ? s2Lessons.value : 6, 10) || 6,
-      duration: parseInt(s2Duration ? s2Duration.value : 45, 10) || 45,
-      breakDur: parseInt(s2Break ? s2Break.value : 5, 10) || 5,
-      bigBreak: parseInt(s2BigBreak ? s2BigBreak.value : 5, 10) || 5
-    }
+    s1: sanitizeShiftCfg({
+      startH: t1.h, startM: t1.m,
+      lessons: s1Lessons ? s1Lessons.value : 6,
+      duration: s1Duration ? s1Duration.value : 45,
+      breakDur: s1Break ? s1Break.value : 5,
+      bigBreak: s1BigBreak ? s1BigBreak.value : 5
+    }, DEFAULT_SHIFT_SETTINGS.s1),
+    s2: sanitizeShiftCfg({
+      startH: t2.h, startM: t2.m,
+      lessons: s2Lessons ? s2Lessons.value : 6,
+      duration: s2Duration ? s2Duration.value : 45,
+      breakDur: s2Break ? s2Break.value : 5,
+      bigBreak: s2BigBreak ? s2BigBreak.value : 5
+    }, DEFAULT_SHIFT_SETTINGS.s2)
   };
 
   try {
@@ -1167,7 +1241,7 @@ function renderDynamicPresetChips() {
         shortLabel = `${timeStr} (1-smena yakuni)`;
       }
 
-      html += `<button type="button" class="${chipClass}" data-time="${timeStr}" data-title="${escapeHtml(item.title)}" data-sound="barkamol">${icon} ${shortLabel}</button>\n`;
+      html += `<button type="button" class="${chipClass}" data-time="${escapeHtml(timeStr)}" data-title="${escapeHtml(item.title)}" data-sound="barkamol">${icon} ${escapeHtml(shortLabel)}</button>\n`;
     });
     html += `<button type="button" class="preset-chip" data-offset="1" data-sound="barkamol">+1 daq (Sinov)</button>\n`;
     html += `<button type="button" class="preset-chip" data-offset="5" data-sound="barkamol">+5 daq</button>`;
@@ -1195,7 +1269,7 @@ function renderDynamicPresetChips() {
         shortLabel = `${timeStr} (2-smena yakuni)`;
       }
 
-      html += `<button type="button" class="${chipClass}" data-time="${timeStr}" data-title="${escapeHtml(item.title)}" data-sound="barkamol">${icon} ${shortLabel}</button>\n`;
+      html += `<button type="button" class="${chipClass}" data-time="${escapeHtml(timeStr)}" data-title="${escapeHtml(item.title)}" data-sound="barkamol">${icon} ${escapeHtml(shortLabel)}</button>\n`;
     });
     html += `<button type="button" class="preset-chip" data-offset="1" data-sound="barkamol">+1 daq (Sinov)</button>\n`;
     html += `<button type="button" class="preset-chip" data-offset="5" data-sound="barkamol">+5 daq</button>`;
@@ -1382,7 +1456,7 @@ function snoozeRingingAlarm() {
   if (!STATE.activeRingingAlarm) return;
 
   const currentAlarm = STATE.activeRingingAlarm;
-  const snoozeMins = parseInt(currentAlarm.snoozeMinutes || 5, 10);
+  const snoozeMins = clampInt(currentAlarm.snoozeMinutes, 1, 60, 5);
 
   // Calculate new time
   const targetDate = new Date();
@@ -1399,7 +1473,7 @@ function snoozeRingingAlarm() {
     STATE.alarms[idx].minute = newM;
     STATE.alarms[idx].second = newS;
     STATE.alarms[idx].enabled = true;
-    STATE.alarms[idx].title = `${currentAlarm.title} (Kechiktirilgan)`;
+    STATE.alarms[idx].title = cleanText(`${currentAlarm.title} (Kechiktirilgan)`, MAX_TITLE_LENGTH + 20, "Dars qo'ng'irog'i");
     saveAlarms();
   }
 
@@ -1497,43 +1571,60 @@ function renderAlarmsList() {
     // Calculate duration display and sound badge
     const durSec = parseInt(alarm.durationSeconds, 10) || 60;
     const durLabel = (durSec >= 60) ? `${Math.floor(durSec / 60)} daq` : `${durSec}s`;
-    let soundBadgeHtml = "";
+    const soundBadgeEl = document.createElement('span');
+    soundBadgeEl.className = 'alarm-item-duration';
     if (alarm.sound === 'barkamol') {
       const isEnd = alarm.title && (alarm.title.includes('Darslar yakuni') || alarm.title.includes('Oxirgi ohang'));
       const isBreak = alarm.title && alarm.title.toLowerCase().includes('tanaffus');
-      const badgeText = isEnd
+      soundBadgeEl.classList.add('badge-barkamol');
+      soundBadgeEl.textContent = isEnd
         ? `🎵 Barkamol avlod (Oxirgi ohang - ${durLabel})`
         : (isBreak ? `🎵 Barkamol avlod (Tanaffus - ${durLabel})` : `🎵 Barkamol avlod (Dars - ${durLabel})`);
-      soundBadgeHtml = `<span class="alarm-item-duration badge-barkamol" title="Barkamol avlod qo'shig'i, davomiyligi: ${durSec} soniya">${badgeText}</span>`;
+      soundBadgeEl.title = `Barkamol avlod qo'shig'i, davomiyligi: ${durSec} soniya`;
     } else if (alarm.sound === 'qongiroq') {
-      soundBadgeHtml = `<span class="alarm-item-duration badge-qongiroq" title="Maktab qo'ng'irog'i, davomiyligi: ${durSec} soniya">🔔 Qo'ng'iroq (${durLabel})</span>`;
+      soundBadgeEl.classList.add('badge-qongiroq');
+      soundBadgeEl.textContent = `🔔 Qo'ng'iroq (${durLabel})`;
+      soundBadgeEl.title = `Maktab qo'ng'irog'i, davomiyligi: ${durSec} soniya`;
     } else {
       const soundBadge = (alarm.sound === 'school') ? '🏫 Zvonok' : (alarm.sound === 'melodic' ? '✨ Melodiya' : '⏱️ Signal');
-      soundBadgeHtml = `<span class="alarm-item-duration" title="Ohang: ${alarm.sound}, davomiyligi: ${durSec} soniya">${soundBadge} (${durLabel})</span>`;
+      soundBadgeEl.textContent = `${soundBadge} (${durLabel})`;
+      soundBadgeEl.title = `Ohang: ${alarm.sound}, davomiyligi: ${durSec} soniya`;
     }
 
-    item.innerHTML = `
-      <div class="alarm-item-left">
-        <div class="alarm-item-time">
-          ${displayTime}
-          ${ampmStr ? `<span class="alarm-item-ampm">${ampmStr}</span>` : ''}
-        </div>
-        <div class="alarm-item-info">
-          <span class="alarm-item-title">${escapeHtml(alarm.title || "Dars qo'ng'irog'i")}</span>
-          ${soundBadgeHtml}
-          <span class="alarm-item-countdown" data-countdown-id="${alarm.id}">${countdownText}</span>
-        </div>
-      </div>
-      <div class="alarm-item-right">
-        <label class="switch" title="${alarm.enabled ? "Qo'ng'iroqni o'chirish" : "Qo'ng'iroqni yoqish"}">
-          <input type="checkbox" class="alarm-toggle" data-id="${alarm.id}" ${alarm.enabled ? 'checked' : ''}>
-          <span class="slider"></span>
-        </label>
-        <button class="btn-delete-alarm" data-id="${alarm.id}" title="O'chirib tashlash">
-          🗑️
-        </button>
-      </div>
-    `;
+    const mk = (tag, cls, text) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    };
+
+    const left = mk('div', 'alarm-item-left');
+    const timeEl = mk('div', 'alarm-item-time', displayTime);
+    if (ampmStr) timeEl.appendChild(mk('span', 'alarm-item-ampm', ampmStr));
+    const info = mk('div', 'alarm-item-info');
+    info.appendChild(mk('span', 'alarm-item-title', alarm.title || "Dars qo'ng'irog'i"));
+    info.appendChild(soundBadgeEl);
+    const countdownEl = mk('span', 'alarm-item-countdown', countdownText);
+    countdownEl.dataset.countdownId = alarm.id;
+    info.appendChild(countdownEl);
+    left.append(timeEl, info);
+
+    const right = mk('div', 'alarm-item-right');
+    const sw = mk('label', 'switch');
+    sw.title = alarm.enabled ? "Qo'ng'iroqni o'chirish" : "Qo'ng'iroqni yoqish";
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'alarm-toggle';
+    chk.dataset.id = alarm.id;
+    chk.checked = !!alarm.enabled;
+    sw.append(chk, mk('span', 'slider'));
+    const del = mk('button', 'btn-delete-alarm', '🗑️');
+    del.type = 'button';
+    del.dataset.id = alarm.id;
+    del.title = "O'chirib tashlash";
+    right.append(sw, del);
+
+    item.append(left, right);
 
     DOM.alarmsList.appendChild(item);
   });
@@ -1541,7 +1632,7 @@ function renderAlarmsList() {
 
 function updateAlarmsCountdownBadges() {
   STATE.alarms.forEach(alarm => {
-    const el = document.querySelector(`[data-countdown-id="${alarm.id}"]`);
+    const el = document.querySelector(`[data-countdown-id="${CSS.escape(alarm.id)}"]`);
     if (el) {
       el.textContent = alarm.enabled ? getCountdownText(alarm) : "O'chirilgan";
     }
@@ -1854,17 +1945,21 @@ function setupEventListeners() {
         if (isNaN(m) || m < 0 || m > 59) m = 0;
         if (isNaN(s) || s < 0 || s > 59) s = 0;
 
-        const title = DOM.alarmTitle.value.trim() || "Dars qo'ng'irog'i";
-        const sound = (DOM.alarmSound && DOM.alarmSound.value) ? DOM.alarmSound.value : "barkamol";
+        if (STATE.alarms.length >= MAX_ALARMS) {
+          showToast(`Eng ko'pi bilan ${MAX_ALARMS} ta qo'ng'iroq saqlash mumkin`, "warning");
+          return;
+        }
+        const title = cleanText(DOM.alarmTitle.value, MAX_TITLE_LENGTH, "Dars qo'ng'irog'i");
+        const sound = (DOM.alarmSound && ALLOWED_SOUNDS.includes(DOM.alarmSound.value)) ? DOM.alarmSound.value : "barkamol";
         const snoozeRadio = document.querySelector('input[name="snoozeTime"]:checked');
-        const snoozeMinutes = snoozeRadio ? parseInt(snoozeRadio.value, 10) : 5;
+        const snoozeMinutes = snoozeRadio ? clampInt(snoozeRadio.value, 1, 60, 5) : 5;
 
         // Enforce maximum 60 seconds (1 minute) duration
         const durationRadio = document.querySelector('input[name="ringDuration"]:checked');
         const ringDuration = durationRadio ? Math.min(Math.max(parseInt(durationRadio.value, 10) || 60, 1), 60) : 60;
 
         const newAlarm = {
-          id: 'bell_' + Date.now(),
+          id: 'bell_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
           hour: String(h).padStart(2, '0'),
           minute: String(m).padStart(2, '0'),
           second: String(s).padStart(2, '0'),
@@ -2148,7 +2243,11 @@ function setupStopwatch() {
 
     if (DOM.lapsContainer) DOM.lapsContainer.style.display = 'block';
     const li = document.createElement('li');
-    li.innerHTML = `<span>#${lapNum} Davra</span> <span>${formatStopwatch(currentMs).replace(/<\/?span[^>]*>/g, '')}</span>`;
+    const lapLabel = document.createElement('span');
+    lapLabel.textContent = `#${lapNum} Davra`;
+    const lapTime = document.createElement('span');
+    lapTime.textContent = formatStopwatch(currentMs).replace(/<\/?span[^>]*>/g, '');
+    li.append(lapLabel, document.createTextNode(' '), lapTime);
     if (DOM.lapsList) DOM.lapsList.prepend(li);
   }
 
@@ -2159,7 +2258,7 @@ function setupStopwatch() {
 
 // Utility: HTML escape
 function escapeHtml(str) {
-  return str.replace(/[&<>'"]/g, tag => ({
+  return String(str === null || str === undefined ? '' : str).replace(/[&<>'"]/g, tag => ({
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
@@ -2180,7 +2279,11 @@ function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span>🔔</span> <span>${escapeHtml(message)}</span>`;
+  const toastIcon = document.createElement('span');
+  toastIcon.textContent = '🔔';
+  const toastMsg = document.createElement('span');
+  toastMsg.textContent = String(message);
+  toast.append(toastIcon, document.createTextNode(' '), toastMsg);
   container.appendChild(toast);
 
   setTimeout(() => {

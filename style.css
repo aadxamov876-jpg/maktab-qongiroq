@@ -7,14 +7,14 @@
   --bg-card: rgba(18, 24, 38, 0.75);
   --bg-card-hover: rgba(26, 34, 52, 0.85);
   --bg-input: rgba(11, 15, 25, 0.8);
-  
+
   --primary: #6366f1;
   --primary-glow: rgba(99, 102, 241, 0.35);
   --primary-hover: #4f46e5;
 
   --accent-cyan: #06b6d4;
   --accent-cyan-glow: rgba(6, 182, 212, 0.3);
-  
+
   --accent-green: #10b981;
   --accent-green-glow: rgba(16, 185, 129, 0.25);
 
@@ -44,7 +44,9 @@
 }
 
 /* Reset & Base Setup */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -74,13 +76,16 @@ body {
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.2);
 }
+
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
@@ -124,9 +129,17 @@ body {
 }
 
 @keyframes floatAmbient {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(40px, -30px) scale(1.08); }
-  100% { transform: translate(-30px, 40px) scale(0.95); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(40px, -30px) scale(1.08);
+  }
+
+  100% {
+    transform: translate(-30px, 40px) scale(0.95);
+  }
 }
 
 /* Main Container */
@@ -190,6 +203,7 @@ body {
   align-items: center;
   gap: 4px;
 }
+
 .badge-status::before {
   content: '';
   width: 6px;
@@ -374,11 +388,27 @@ body {
 }
 
 @keyframes ringSwing {
-  0%, 100% { transform: rotate(0deg); }
-  20% { transform: rotate(15deg); }
-  40% { transform: rotate(-15deg); }
-  60% { transform: rotate(8deg); }
-  80% { transform: rotate(-8deg); }
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  20% {
+    transform: rotate(15deg);
+  }
+
+  40% {
+    transform: rotate(-15deg);
+  }
+
+  60% {
+    transform: rotate(8deg);
+  }
+
+  80% {
+    transform: rotate(-8deg);
+  }
 }
 
 /* ==========================================================
@@ -546,8 +576,15 @@ body {
 }
 
 @keyframes blinkColon {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
 }
 
 /* Quick presets */
@@ -704,7 +741,7 @@ body {
   transition: var(--transition-fast);
 }
 
-.radio-chip input:checked + span {
+.radio-chip input:checked+span {
   background: rgba(99, 102, 241, 0.15);
   border-color: var(--primary);
   color: #fff;
@@ -1028,14 +1065,14 @@ body {
   background-color: white;
   transition: var(--transition-fast);
   border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-input:checked + .slider {
+input:checked+.slider {
   background: #10b981;
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(22px);
 }
 
@@ -1068,18 +1105,27 @@ input:checked + .slider:before {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.timer-card, .stopwatch-card {
+.timer-card,
+.stopwatch-card {
   max-width: 600px;
   margin: 0 auto;
   text-align: center;
   padding: 36px 28px;
 }
 
-.timer-display-box, .stopwatch-display-box {
+.timer-display-box,
+.stopwatch-display-box {
   font-family: var(--font-mono);
   font-size: clamp(2.8rem, 8vw, 4.2rem);
   font-weight: 800;
@@ -1144,7 +1190,8 @@ input:checked + .slider:before {
   margin-bottom: 28px;
 }
 
-.timer-controls, .stopwatch-controls {
+.timer-controls,
+.stopwatch-controls {
   display: flex;
   justify-content: center;
   gap: 12px;
@@ -1206,8 +1253,13 @@ input:checked + .slider:before {
 }
 
 @keyframes overlayFlash {
-  0% { background: rgba(8, 12, 24, 0.88); }
-  100% { background: rgba(45, 12, 28, 0.92); }
+  0% {
+    background: rgba(8, 12, 24, 0.88);
+  }
+
+  100% {
+    background: rgba(45, 12, 28, 0.92);
+  }
 }
 
 .ringing-card {
@@ -1225,8 +1277,15 @@ input:checked + .slider:before {
 }
 
 @keyframes modalPop {
-  0% { transform: scale(0.85); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .ringing-bell-wrapper {
@@ -1246,8 +1305,13 @@ input:checked + .slider:before {
 }
 
 @keyframes violentRing {
-  0% { transform: rotate(-25deg); }
-  100% { transform: rotate(25deg); }
+  0% {
+    transform: rotate(-25deg);
+  }
+
+  100% {
+    transform: rotate(25deg);
+  }
 }
 
 .ringing-wave-effect {
@@ -1259,8 +1323,15 @@ input:checked + .slider:before {
 }
 
 @keyframes waveExpand {
-  0% { transform: scale(0.6); opacity: 1; }
-  100% { transform: scale(1.6); opacity: 0; }
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
 }
 
 .ringing-badge {
@@ -1278,8 +1349,13 @@ input:checked + .slider:before {
 }
 
 @keyframes badgeBlink {
-  0% { opacity: 0.6; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0.6;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 .ringing-time {
@@ -1414,7 +1490,7 @@ input:checked + .slider:before {
   border: 1px solid rgba(99, 102, 241, 0.4);
   padding: 12px 20px;
   border-radius: var(--radius-lg);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(12px);
   z-index: 1000;
   display: none;
@@ -1482,8 +1558,15 @@ input:checked + .slider:before {
 }
 
 @keyframes gentlePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.12); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.12);
+  }
 }
 
 .footer-credit-badge .badge-text {
@@ -1509,6 +1592,7 @@ input:checked + .slider:before {
     padding: 12px 16px;
     font-size: 0.82rem;
   }
+
   .footer-credit-badge .badge-text {
     font-size: 0.82rem;
   }
@@ -1558,8 +1642,15 @@ input:checked + .slider:before {
 }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translateY(-12px) scale(0.95); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .toast.toast-out {
@@ -1722,7 +1813,9 @@ input:checked + .slider:before {
   border-color: rgba(56, 189, 248, 0.35);
   background: linear-gradient(135deg, rgba(14, 165, 233, 0.06), rgba(99, 102, 241, 0.06));
 }
-.btn-shift-load.shift-1:hover, .btn-shift-load.shift-1.active {
+
+.btn-shift-load.shift-1:hover,
+.btn-shift-load.shift-1.active {
   border-color: rgba(56, 189, 248, 0.75);
   background: linear-gradient(135deg, rgba(14, 165, 233, 0.18), rgba(99, 102, 241, 0.18));
   box-shadow: 0 4px 18px rgba(14, 165, 233, 0.25);
@@ -1732,7 +1825,9 @@ input:checked + .slider:before {
   border-color: rgba(168, 85, 247, 0.35);
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.06), rgba(236, 72, 153, 0.06));
 }
-.btn-shift-load.shift-2:hover, .btn-shift-load.shift-2.active {
+
+.btn-shift-load.shift-2:hover,
+.btn-shift-load.shift-2.active {
   border-color: rgba(168, 85, 247, 0.75);
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.18), rgba(236, 72, 153, 0.18));
   box-shadow: 0 4px 18px rgba(168, 85, 247, 0.25);
@@ -1743,6 +1838,7 @@ input:checked + .slider:before {
   border-color: rgba(245, 158, 11, 0.35);
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(99, 102, 241, 0.08));
 }
+
 .btn-shift-all:hover {
   border-color: rgba(245, 158, 11, 0.75);
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(99, 102, 241, 0.18));
@@ -1854,6 +1950,7 @@ input:checked + .slider:before {
     opacity: 0;
     transform: translateY(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -2052,6 +2149,7 @@ input:checked + .slider:before {
   border-color: rgba(99, 102, 241, 0.35) !important;
   color: #a5b4fc !important;
 }
+
 .preset-chip-lesson:hover {
   background: rgba(99, 102, 241, 0.25) !important;
   border-color: #818cf8 !important;
@@ -2063,6 +2161,7 @@ input:checked + .slider:before {
   border-color: rgba(14, 165, 233, 0.35) !important;
   color: #7dd3fc !important;
 }
+
 .preset-chip-break:hover {
   background: rgba(14, 165, 233, 0.22) !important;
   border-color: #38bdf8 !important;
@@ -2075,6 +2174,7 @@ input:checked + .slider:before {
   color: #fbbf24 !important;
   font-weight: 700 !important;
 }
+
 .preset-chip-end:hover {
   background: rgba(245, 158, 11, 0.25) !important;
   color: #ffffff !important;
@@ -2266,8 +2366,15 @@ input:checked + .slider:before {
 }
 
 @keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .shift-settings-tabs {
@@ -2330,7 +2437,8 @@ input:checked + .slider:before {
   font-weight: 500;
 }
 
-.config-input, .config-select {
+.config-input,
+.config-select {
   background: rgba(30, 41, 59, 0.7);
   border: 1px solid var(--border-subtle);
   color: #ffffff;
@@ -2342,7 +2450,8 @@ input:checked + .slider:before {
   transition: border-color var(--transition-fast);
 }
 
-.config-input:focus, .config-select:focus {
+.config-input:focus,
+.config-select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px var(--primary-glow);
 }
@@ -2412,3 +2521,19 @@ input:checked + .slider:before {
   color: #ffffff !important;
 }
 
+
+
+/* ==========================================================
+   Initial hidden state (moved from inline style="" attributes
+   so the page can run under a strict Content-Security-Policy).
+   JS sets element.style.display inline, which overrides these.
+   ========================================================== */
+#shiftSettingsPanel,
+#shiftConfigForm2,
+#presetsRowShift2,
+#clearAllAlarmsBtn,
+#timerPauseBtn,
+#lapsContainer,
+#ringingModal {
+  display: none;
+}
