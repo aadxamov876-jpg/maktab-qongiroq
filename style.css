@@ -1869,23 +1869,31 @@ input:checked+.slider:before {
   font-family: var(--font-mono);
 }
 
-/* Shift Customizer (Smena vaqtlarini qo'lda sozlash) */
+/* ==========================================================
+   MANUAL SHIFT CUSTOMIZER STYLES (SMENA VAQTLARINI SOZLASH)
+   ========================================================== */
 .shift-customizer-container {
-  margin-top: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  margin-top: 10px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all var(--transition-normal);
+}
+
+.shift-customizer-container:hover {
+  border-color: rgba(99, 102, 241, 0.35);
 }
 
 .btn-toggle-shift-settings {
   width: 100%;
   background: rgba(99, 102, 241, 0.08);
-  border: 1px dashed rgba(99, 102, 241, 0.35);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  color: #cbd5e1;
+  border: none;
+  border-bottom: 1px dashed rgba(99, 102, 241, 0.3);
+  padding: 11px 14px;
+  color: #e2e8f0;
   font-family: inherit;
-  font-size: 0.84rem;
+  font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -1897,13 +1905,11 @@ input:checked+.slider:before {
 
 .btn-toggle-shift-settings:hover {
   background: rgba(99, 102, 241, 0.16);
-  border-color: rgba(99, 102, 241, 0.65);
   color: #ffffff;
-  transform: translateY(-1px);
 }
 
 .btn-gear-icon {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   line-height: 1;
 }
 
@@ -1915,8 +1921,8 @@ input:checked+.slider:before {
 .btn-gear-badge {
   font-size: 0.7rem;
   padding: 2px 8px;
-  background: rgba(14, 165, 233, 0.15);
-  border: 1px solid rgba(14, 165, 233, 0.35);
+  background: rgba(14, 165, 233, 0.18);
+  border: 1px solid rgba(14, 165, 233, 0.4);
   color: #38bdf8;
   border-radius: 10px;
   font-weight: 600;
@@ -1934,14 +1940,13 @@ input:checked+.slider:before {
 }
 
 .shift-settings-panel {
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(99, 102, 241, 0.28);
-  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.88);
+  border-top: 1px solid rgba(99, 102, 241, 0.25);
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
   animation: fadeInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1972,7 +1977,7 @@ input:checked+.slider:before {
   border: none;
   color: #94a3b8;
   font-family: inherit;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 600;
   padding: 8px 12px;
   border-radius: 6px;
@@ -1983,14 +1988,14 @@ input:checked+.slider:before {
 
 .shift-settings-tab:hover {
   color: #f1f5f9;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .shift-settings-tab.active {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(14, 165, 233, 0.35));
-  border: 1px solid rgba(99, 102, 241, 0.5);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.4), rgba(14, 165, 233, 0.4));
+  border: 1px solid rgba(99, 102, 241, 0.55);
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
 }
 
 .shift-config-form {
@@ -2002,7 +2007,7 @@ input:checked+.slider:before {
 .config-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 @media (max-width: 580px) {
@@ -2014,7 +2019,7 @@ input:checked+.slider:before {
 .config-item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .config-item.full-width {
@@ -2022,17 +2027,17 @@ input:checked+.slider:before {
 }
 
 .config-label {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: #cbd5e1;
 }
 
 .config-input,
 .config-select {
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: 7px 11px;
   color: #f8fafc;
   font-family: inherit;
   font-size: 0.86rem;
@@ -2057,14 +2062,242 @@ input:checked+.slider:before {
   color: #38bdf8;
 }
 
+/* Recalculate button row */
+.config-recalc-row {
+  display: flex;
+  margin-top: 2px;
+}
+
+.btn-recalc {
+  width: 100%;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px dashed rgba(99, 102, 241, 0.4);
+  color: #c7d2fe;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
+}
+
+.btn-recalc:hover {
+  background: rgba(99, 102, 241, 0.22);
+  border-color: #818cf8;
+  color: #ffffff;
+}
+
+/* Manual Bell-by-Bell Editor Section */
+.shift-manual-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.shift-manual-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.editor-header-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.btn-add-shift-row {
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.4);
+  color: #38bdf8;
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-add-shift-row:hover {
+  background: rgba(14, 165, 233, 0.3);
+  color: #ffffff;
+  border-color: #38bdf8;
+}
+
+.shift-bells-list {
+  max-height: 290px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 6px;
+}
+
+/* Custom scrollbar for bells list */
+.shift-bells-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.shift-bells-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.shift-bells-list::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.4);
+  border-radius: 3px;
+}
+
+.shift-bells-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.7);
+}
+
+.shift-bell-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 5px 8px;
+  transition: all var(--transition-fast);
+}
+
+.shift-bell-row:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.shift-bell-idx {
+  min-width: 34px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.15);
+  border-radius: 4px;
+  padding: 3px 5px;
+  flex-shrink: 0;
+}
+
+.shift-bell-time-input {
+  width: 90px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 4px;
+  color: #38bdf8;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 4px 6px;
+  text-align: center;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.shift-bell-time-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.shift-bell-title-input {
+  flex: 1;
+  min-width: 110px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #f1f5f9;
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.shift-bell-title-input:focus {
+  border-color: var(--primary);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.shift-bell-sound-select {
+  width: 135px;
+  background: #0b1120;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-family: inherit;
+  font-size: 0.76rem;
+  padding: 4px 6px;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.shift-bell-sound-select option {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.btn-remove-shift-bell {
+  width: 26px;
+  height: 26px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.btn-remove-shift-bell:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+@media (max-width: 580px) {
+  .shift-bell-row {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .shift-bell-title-input {
+    width: 100%;
+    flex: none;
+    order: 3;
+  }
+
+  .shift-bell-sound-select {
+    flex: 1;
+    width: auto;
+    order: 2;
+  }
+}
+
 .config-preview-badge {
   background: rgba(99, 102, 241, 0.12);
   border: 1px solid rgba(99, 102, 241, 0.3);
   color: #c7d2fe;
-  padding: 10px 14px;
+  padding: 9px 12px;
   border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-  line-height: 1.5;
+  font-size: 0.78rem;
+  line-height: 1.45;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2073,7 +2306,7 @@ input:checked+.slider:before {
 .config-preview-badge b {
   color: #38bdf8;
   font-family: var(--font-mono);
-  font-size: 0.86rem;
+  font-size: 0.84rem;
 }
 
 .config-actions {
@@ -2101,6 +2334,155 @@ input:checked+.slider:before {
 .btn-reset-shift-cfg:hover {
   background: rgba(255, 255, 255, 0.1) !important;
   color: #ffffff !important;
+}
+
+/* Edit Bell Button in Alarms List */
+.btn-edit-alarm {
+  width: 32px;
+  height: 32px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: all var(--transition-fast);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.btn-edit-alarm:hover {
+  background: rgba(99, 102, 241, 0.28);
+  border-color: #818cf8;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.btn-edit-alarm:active {
+  transform: translateY(0);
+}
+
+/* ==========================================================
+   EDIT BELL MODAL
+   ========================================================== */
+.edit-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(3, 7, 18, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.edit-modal-card {
+  background: #0f172a;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 480px;
+  padding: 22px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+  animation: modalPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.edit-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.edit-modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.edit-modal-icon {
+  font-size: 1.15rem;
+}
+
+.btn-close-modal {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: all var(--transition-fast);
+}
+
+.btn-close-modal:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.edit-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.edit-time-inputs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+}
+
+.edit-time-num {
+  width: 65px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: var(--radius-sm);
+  color: #38bdf8;
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 6px;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.edit-time-num:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+}
+
+.edit-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.edit-modal-actions .btn {
+  flex: 1;
 }
 
 /* Preset tabs */
@@ -2289,241 +2671,6 @@ input:checked+.slider:before {
 }
 
 /* ==========================================================
-   MANUAL SHIFT CUSTOMIZER STYLES (SMENA VAQTLARINI SOZLASH)
-   ========================================================== */
-.shift-customizer-container {
-  margin-top: 12px;
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  transition: all var(--transition-normal);
-}
-
-.shift-customizer-container:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-.btn-toggle-shift-settings {
-  width: 100%;
-  background: transparent;
-  border: none;
-  color: #e2e8f0;
-  padding: 10px 14px;
-  font-family: inherit;
-  font-size: 0.86rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.btn-toggle-shift-settings:hover {
-  background: rgba(99, 102, 241, 0.1);
-  color: #ffffff;
-}
-
-.btn-gear-icon {
-  font-size: 1.1rem;
-}
-
-.btn-gear-text {
-  flex: 1;
-  text-align: left;
-}
-
-.btn-gear-badge {
-  background: rgba(99, 102, 241, 0.2);
-  color: #a5b4fc;
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-
-.btn-gear-arrow {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  transition: transform var(--transition-fast);
-}
-
-.btn-toggle-shift-settings.open .btn-gear-arrow {
-  transform: rotate(180deg);
-}
-
-.shift-settings-panel {
-  padding: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(15, 23, 42, 0.65);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  animation: fadeInDown 0.25s ease-out;
-}
-
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.shift-settings-tabs {
-  display: flex;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.25);
-  padding: 4px;
-  border-radius: var(--radius-sm);
-}
-
-.shift-settings-tab {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 7px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.shift-settings-tab:hover {
-  color: #ffffff;
-}
-
-.shift-settings-tab.active {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.4), rgba(6, 182, 212, 0.4));
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
-}
-
-.config-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-@media (max-width: 500px) {
-  .config-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.config-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.config-item.full-width {
-  grid-column: 1 / -1;
-}
-
-.config-label {
-  font-size: 0.76rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.config-input,
-.config-select {
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid var(--border-subtle);
-  color: #ffffff;
-  font-family: inherit;
-  font-size: 0.85rem;
-  padding: 7px 10px;
-  border-radius: var(--radius-sm);
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.config-input:focus,
-.config-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-glow);
-}
-
-.config-time-wrap {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.config-num-input {
-  width: 52px;
-  text-align: center;
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid var(--border-subtle);
-  color: #ffffff;
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 6px;
-  border-radius: var(--radius-sm);
-  outline: none;
-}
-
-.config-num-input:focus {
-  border-color: var(--primary);
-}
-
-.config-time-wrap .colon {
-  font-weight: 700;
-  color: var(--primary);
-}
-
-.config-preview-badge {
-  margin-top: 10px;
-  background: rgba(14, 165, 233, 0.1);
-  border: 1px solid rgba(14, 165, 233, 0.3);
-  color: #7dd3fc;
-  font-size: 0.78rem;
-  padding: 7px 12px;
-  border-radius: 8px;
-}
-
-.config-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-  flex-wrap: wrap;
-}
-
-.btn-save-shift-cfg {
-  flex: 1;
-  padding: 9px 14px !important;
-  font-size: 0.85rem !important;
-  min-width: 180px;
-}
-
-.btn-reset-shift-cfg {
-  padding: 9px 12px !important;
-  font-size: 0.85rem !important;
-  background: rgba(255, 255, 255, 0.06) !important;
-  color: #cbd5e1 !important;
-}
-
-.btn-reset-shift-cfg:hover {
-  background: rgba(255, 255, 255, 0.15) !important;
-  color: #ffffff !important;
-}
-
-
-
-/* ==========================================================
    Initial hidden state (moved from inline style="" attributes
    so the page can run under a strict Content-Security-Policy).
    JS sets element.style.display inline, which overrides these.
@@ -2534,6 +2681,7 @@ input:checked+.slider:before {
 #clearAllAlarmsBtn,
 #timerPauseBtn,
 #lapsContainer,
-#ringingModal {
+#ringingModal,
+#editAlarmModal {
   display: none;
 }

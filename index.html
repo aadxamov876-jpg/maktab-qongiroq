@@ -15,7 +15,7 @@
   <link referrerpolicy="no-referrer"
     href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.3">
+  <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 
 <body>
@@ -190,6 +190,23 @@
                       </select>
                     </div>
                   </div>
+                  <div class="config-recalc-row">
+                    <button type="button" class="btn-recalc" id="btnAutoCalcS1">
+                      <span>⚡</span> Ushbu parametrlar bo'yicha jadvalni yangilash
+                    </button>
+                  </div>
+
+                  <!-- 1-smena: Har bir qo'ng'iroqni qo'lda o'zgartirish bloki -->
+                  <div class="shift-manual-editor">
+                    <div class="shift-manual-editor-header">
+                      <span class="editor-header-title">📋 1-smena qo'ng'iroqlari (qo'lda o'zgartirish):</span>
+                      <button type="button" class="btn-add-shift-row" id="btnAddShiftRow1">➕ Qo'ng'iroq qo'shish</button>
+                    </div>
+                    <div class="shift-bells-list" id="shiftBellsList1">
+                      <!-- Dynamic rows filled by app.js -->
+                    </div>
+                  </div>
+
                   <div class="config-preview-badge" id="cfgS1Preview">
                     📊 Hisoblangan: <b>08:00 — 12:55</b> (6 ta dars, barchasida 1 daq Barkamol avlod)
                   </div>
@@ -229,6 +246,23 @@
                       </select>
                     </div>
                   </div>
+                  <div class="config-recalc-row">
+                    <button type="button" class="btn-recalc" id="btnAutoCalcS2">
+                      <span>⚡</span> Ushbu parametrlar bo'yicha jadvalni yangilash
+                    </button>
+                  </div>
+
+                  <!-- 2-smena: Har bir qo'ng'iroqni qo'lda o'zgartirish bloki -->
+                  <div class="shift-manual-editor">
+                    <div class="shift-manual-editor-header">
+                      <span class="editor-header-title">📋 2-smena qo'ng'iroqlari (qo'lda o'zgartirish):</span>
+                      <button type="button" class="btn-add-shift-row" id="btnAddShiftRow2">➕ Qo'ng'iroq qo'shish</button>
+                    </div>
+                    <div class="shift-bells-list" id="shiftBellsList2">
+                      <!-- Dynamic rows filled by app.js -->
+                    </div>
+                  </div>
+
                   <div class="config-preview-badge" id="cfgS2Preview">
                     📊 Hisoblangan: <b>13:10 — 18:05</b> (6 ta dars, barchasida 1 daq Barkamol avlod)
                   </div>
@@ -237,7 +271,7 @@
                 <!-- Config Actions -->
                 <div class="config-actions">
                   <button type="button" class="btn btn-primary btn-save-shift-cfg" id="saveShiftConfigBtn">
-                    <span>💾</span> Sozlamalarni saqlash va jadvalni qo'llash
+                    <span>💾</span> Sozlamalarni saqlash va jadvalga qo'llash
                   </button>
                   <button type="button" class="btn btn-secondary btn-reset-shift-cfg" id="resetShiftConfigBtn">
                     <span>🔄</span> Standartga qaytarish
@@ -618,6 +652,81 @@
     </footer>
   </div>
 
+  <!-- ================= BELL EDIT MODAL ================= -->
+  <div class="edit-modal-backdrop" id="editAlarmModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+    <div class="edit-modal-card">
+      <div class="edit-modal-header">
+        <h3 id="editModalTitle" class="edit-modal-title"><span class="edit-modal-icon">✏️</span> Qo'ng'iroqni tahrirlash</h3>
+        <button type="button" class="btn-close-modal" id="closeEditModalBtn" title="Yopish">✕</button>
+      </div>
+      <form id="editAlarmForm" class="edit-modal-form">
+        <input type="hidden" id="editAlarmId">
+
+        <div class="form-row">
+          <label class="form-label" for="editAlarmHour">Qo'ng'iroq vaqti (Soat : Daqiqa : Soniya):</label>
+          <div class="edit-time-inputs">
+            <input type="number" id="editAlarmHour" min="0" max="23" class="edit-time-num" placeholder="08" required autocomplete="off">
+            <span class="time-colon">:</span>
+            <input type="number" id="editAlarmMinute" min="0" max="59" class="edit-time-num" placeholder="00" required autocomplete="off">
+            <span class="time-colon">:</span>
+            <input type="number" id="editAlarmSecond" min="0" max="59" class="edit-time-num" value="00" placeholder="00" required autocomplete="off">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label" for="editAlarmTitle">Dars nomi / Qo'ng'iroq sababi:</label>
+          <input type="text" id="editAlarmTitle" class="form-input" maxlength="60" placeholder="Masalan: 1-Dars boshlanishi" required autocomplete="off">
+        </div>
+
+        <div class="form-row">
+          <label class="form-label" for="editAlarmSound">Ohang / Musiqa:</label>
+          <div class="select-container">
+            <select id="editAlarmSound">
+              <option value="barkamol">🎵 Ozodbek Nazarbekov - Barkamol avlod (MP3)</option>
+              <option value="qongiroq">🔔 Maktab Qo'ng'irog'i (Standart jarangdor MP3)</option>
+              <option value="school">🏫 Maktab Elektr Qo'ng'irog'i (Zvonok)</option>
+              <option value="melodic">✨ Chiroyli Melodiya (Sehrli Arpeggio)</option>
+              <option value="siren">🚨 Tezkor Signal (Radar)</option>
+              <option value="gentle">🌅 Yumshoq Tong (Chime)</option>
+              <option value="classic">⏰ Klassik Budilnik (Raqamli Bi-Bi)</option>
+              <option value="retro">👾 8-Bit Retro Game</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label-row">
+            <label class="form-label">Qo'ng'iroq / Musiqa davomiyligi:</label>
+            <span class="form-hint-badge">Maks. 1 daqiqa</span>
+          </div>
+          <div class="duration-options">
+            <label class="radio-chip">
+              <input type="radio" name="editRingDuration" value="15">
+              <span>15 soniya</span>
+            </label>
+            <label class="radio-chip">
+              <input type="radio" name="editRingDuration" value="30">
+              <span>30 soniya</span>
+            </label>
+            <label class="radio-chip">
+              <input type="radio" name="editRingDuration" value="60" checked>
+              <span>60 soniya (1 daqiqa)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="edit-modal-actions">
+          <button type="submit" class="btn btn-primary" id="saveEditAlarmBtn">
+            <span>💾</span> O'zgarishlarni saqlash
+          </button>
+          <button type="button" class="btn btn-secondary" id="cancelEditModalBtn">
+            Bekor qilish
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ================= BELL RINGING FULLSCREEN MODAL ================= -->
   <div class="alarm-ringing-modal" id="ringingModal" role="dialog" aria-modal="true" aria-labelledby="ringingTitle">
     <div class="ringing-overlay"></div>
@@ -662,7 +771,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=2.5"></script>
+  <script src="app.js?v=3.0"></script>
 </body>
 
 </html>

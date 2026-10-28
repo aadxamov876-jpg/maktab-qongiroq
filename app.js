@@ -83,6 +83,44 @@ const DEFAULT_SHIFT_SETTINGS = {
   s2: { startH: 13, startM: 10, lessons: 6, duration: 45, breakDur: 5, bigBreak: 5 }
 };
 
+const CUSTOM_SCHEDULES_KEY = 'smart_qongiroq_custom_schedules';
+
+function sanitizeCustomBellItem(raw, defaultShift = 1) {
+  if (!raw || typeof raw !== 'object') return null;
+  const h = clampInt(raw.hour, 0, 23, 8);
+  const m = clampInt(raw.minute, 0, 59, 0);
+  const s = clampInt(raw.second, 0, 59, 0);
+  const sound = ALLOWED_SOUNDS.includes(raw.sound) ? raw.sound : 'barkamol';
+  const durationSeconds = clampInt(raw.durationSeconds, 1, 60, 60);
+  const title = cleanText(raw.title, MAX_TITLE_LENGTH, "Dars qo'ng'irog'i");
+  const shift = (raw.shift === 2 || defaultShift === 2) ? 2 : 1;
+  return {
+    hour: String(h).padStart(2, '0'),
+    minute: String(m).padStart(2, '0'),
+    second: String(s).padStart(2, '0'),
+    title,
+    sound,
+    durationSeconds,
+    shift
+  };
+}
+
+function loadStoredCustomShiftSchedules() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SCHEDULES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        s1: Array.isArray(parsed?.s1) ? parsed.s1.map(b => sanitizeCustomBellItem(b, 1)).filter(Boolean) : null,
+        s2: Array.isArray(parsed?.s2) ? parsed.s2.map(b => sanitizeCustomBellItem(b, 2)).filter(Boolean) : null
+      };
+    }
+  } catch (e) {
+    console.warn("Custom shift schedules yuklashda xatolik:", e);
+  }
+  return { s1: null, s2: null };
+}
+
 function loadStoredShiftSettings() {
   try {
     const raw = localStorage.getItem('smart_qongiroq_shift_settings');
@@ -104,6 +142,11 @@ const STATE = {
   is24Hour: true,
   bigBreakDuration: (parseInt(localStorage.getItem('smart_qongiroq_big_break') || '5', 10) === 10) ? 10 : 5,
   shiftSettings: loadStoredShiftSettings(),
+  customShiftSchedules: loadStoredCustomShiftSchedules(),
+  editingShiftBells: {
+    s1: [],
+    s2: []
+  },
   alarms: [],
   activeRingingAlarm: null,
   ringingIntervalId: null,
@@ -283,6 +326,12 @@ function calculateSchoolSchedule(options = {}) {
 // Standart va sozlanuvchi 1-smena va 2-smena maktab dars jadvali
 function getStandardSchoolSchedule(shift = 1) {
   const sKey = shift === 2 ? 's2' : 's1';
+
+  // Agar foydalanuvchi smena qo'ng'iroqlarini qo'lda o'zgartirib saqlagan bo'lsa
+  if (STATE.customShiftSchedules && Array.isArray(STATE.customShiftSchedules[sKey]) && STATE.customShiftSchedules[sKey].length > 0) {
+    return JSON.parse(JSON.stringify(STATE.customShiftSchedules[sKey]));
+  }
+
   const cfg = (STATE.shiftSettings && STATE.shiftSettings[sKey])
     ? STATE.shiftSettings[sKey]
     : DEFAULT_SHIFT_SETTINGS[sKey];
@@ -646,11 +695,30 @@ const DOM = {
   cfgS2Break: document.getElementById('cfgS2Break'),
   cfgS2BigBreak: document.getElementById('cfgS2BigBreak'),
   cfgS2Preview: document.getElementById('cfgS2Preview'),
+  btnAutoCalcS1: document.getElementById('btnAutoCalcS1'),
+  btnAutoCalcS2: document.getElementById('btnAutoCalcS2'),
+  btnAddShiftRow1: document.getElementById('btnAddShiftRow1'),
+  btnAddShiftRow2: document.getElementById('btnAddShiftRow2'),
+  shiftBellsList1: document.getElementById('shiftBellsList1'),
+  shiftBellsList2: document.getElementById('shiftBellsList2'),
   saveShiftConfigBtn: document.getElementById('saveShiftConfigBtn'),
   resetShiftConfigBtn: document.getElementById('resetShiftConfigBtn'),
   shift1ButtonTimeLabel: document.getElementById('shift1ButtonTimeLabel'),
   shift2ButtonTimeLabel: document.getElementById('shift2ButtonTimeLabel'),
   allShiftsButtonTimeLabel: document.getElementById('allShiftsButtonTimeLabel'),
+
+  // Edit Alarm Modal
+  editAlarmModal: document.getElementById('editAlarmModal'),
+  closeEditModalBtn: document.getElementById('closeEditModalBtn'),
+  cancelEditModalBtn: document.getElementById('cancelEditModalBtn'),
+  editAlarmForm: document.getElementById('editAlarmForm'),
+  editAlarmId: document.getElementById('editAlarmId'),
+  editAlarmHour: document.getElementById('editAlarmHour'),
+  editAlarmMinute: document.getElementById('editAlarmMinute'),
+  editAlarmSecond: document.getElementById('editAlarmSecond'),
+  editAlarmTitle: document.getElementById('editAlarmTitle'),
+  editAlarmSound: document.getElementById('editAlarmSound'),
+  saveEditAlarmBtn: document.getElementById('saveEditAlarmBtn'),
 
   // Ringing Modal
   ringingModal: document.getElementById('ringingModal'),
@@ -822,11 +890,6 @@ function loadAlarms() {
       STATE.alarms = list
         .map((a, i) => sanitizeAlarm(a, i))
         .filter(a => a && !seenIds.has(a.id) && seenIds.add(a.id));
-      // Standart bo'yicha HAMMASI 1 minutlik Barkamol avlod qo'shig'i bo'lishi ta'minlanadi
-      STATE.alarms.forEach(a => {
-        a.sound = 'barkamol';
-        a.durationSeconds = 60;
-      });
       saveAlarms();
     } else {
       // Dastlabki yuklash: Standart 1-smena dars jadvalini tayyorlab qo'yish (hammasi 1 daqiqalik Barkamol avlod)
@@ -917,9 +980,9 @@ function loadSchoolSchedule(shift = 1) {
       minute: item.minute,
       second: item.second,
       title: item.title,
-      sound: 'barkamol', // Hammasi 1 minutlik Barkamol avlod!
-      snoozeMinutes: 5,
-      durationSeconds: 60, // 1 minut jaranglaydi
+      sound: item.sound || 'barkamol', // Standart: Barkamol avlod (yoki tanlangan ohang)
+      snoozeMinutes: item.snoozeMinutes || 5,
+      durationSeconds: item.durationSeconds || 60, // Standart 1 minut (yoki tanlangan davomiylik)
       enabled: true,
       createdAt: Date.now() + index
     });
@@ -995,13 +1058,20 @@ function initShiftCustomizerUI() {
   if (s2Break) s2Break.value = String(cfg2.breakDur);
   if (s2BigBreak) s2BigBreak.value = String(cfg2.bigBreak);
 
+  // Initialize draft bells for manual editing
+  STATE.editingShiftBells.s1 = getStandardSchoolSchedule(1);
+  STATE.editingShiftBells.s2 = getStandardSchoolSchedule(2);
+
+  renderShiftBellsList(1);
+  renderShiftBellsList(2);
+
   // Toggle open/close drawer
   if (toggleBtn && panel) {
     toggleBtn.addEventListener('click', () => {
-      const isClosed = panel.style.display === 'none' || panel.style.display === '';
-      panel.style.display = isClosed ? 'flex' : 'none';
-      toggleBtn.classList.toggle('open', isClosed);
-      if (arrow) arrow.textContent = isClosed ? '▲' : '▼';
+      const isHidden = panel.style.display === 'none' || (!panel.style.display && window.getComputedStyle(panel).display === 'none');
+      panel.style.display = isHidden ? 'flex' : 'none';
+      toggleBtn.classList.toggle('open', isHidden);
+      if (arrow) arrow.textContent = isHidden ? '▲' : '▼';
     });
   }
 
@@ -1021,12 +1091,25 @@ function initShiftCustomizerUI() {
     });
   }
 
-  // Live input changes update previews
-  [s1Start, s1Lessons, s1Duration, s1Break, s1BigBreak, s2Start, s2Lessons, s2Duration, s2Break, s2BigBreak].forEach(input => {
-    if (!input) return;
-    input.addEventListener('input', updateShiftCustomizerPreviews);
-    input.addEventListener('change', updateShiftCustomizerPreviews);
-  });
+  // Recalculate shift bells buttons
+  const calcBtn1 = DOM.btnAutoCalcS1 || document.getElementById('btnAutoCalcS1');
+  const calcBtn2 = DOM.btnAutoCalcS2 || document.getElementById('btnAutoCalcS2');
+  if (calcBtn1) {
+    calcBtn1.addEventListener('click', () => recalculateShiftFromForm(1));
+  }
+  if (calcBtn2) {
+    calcBtn2.addEventListener('click', () => recalculateShiftFromForm(2));
+  }
+
+  // Add shift bell row buttons
+  const addBtn1 = DOM.btnAddShiftRow1 || document.getElementById('btnAddShiftRow1');
+  const addBtn2 = DOM.btnAddShiftRow2 || document.getElementById('btnAddShiftRow2');
+  if (addBtn1) {
+    addBtn1.addEventListener('click', () => addShiftBellRow(1));
+  }
+  if (addBtn2) {
+    addBtn2.addEventListener('click', () => addShiftBellRow(2));
+  }
 
   // Save button
   if (saveBtn) {
@@ -1041,78 +1124,244 @@ function initShiftCustomizerUI() {
   updateShiftCustomizerPreviews();
 }
 
-function updateShiftCustomizerPreviews() {
-  const s1Start = document.getElementById('cfgS1Start');
-  const s1Lessons = document.getElementById('cfgS1Lessons');
-  const s1Duration = document.getElementById('cfgS1Duration');
-  const s1Break = document.getElementById('cfgS1Break');
-  const s1BigBreak = document.getElementById('cfgS1BigBreak');
-  const preview1 = document.getElementById('cfgS1Preview');
+function renderShiftBellsList(shift = 1) {
+  const isS2 = (shift === 2);
+  const listEl = isS2 ? (DOM.shiftBellsList2 || document.getElementById('shiftBellsList2'))
+                      : (DOM.shiftBellsList1 || document.getElementById('shiftBellsList1'));
+  if (!listEl) return;
 
-  const s2Start = document.getElementById('cfgS2Start');
-  const s2Lessons = document.getElementById('cfgS2Lessons');
-  const s2Duration = document.getElementById('cfgS2Duration');
-  const s2Break = document.getElementById('cfgS2Break');
-  const s2BigBreak = document.getElementById('cfgS2BigBreak');
-  const preview2 = document.getElementById('cfgS2Preview');
+  const sKey = isS2 ? 's2' : 's1';
+  const bells = STATE.editingShiftBells[sKey] || [];
 
-  if (s1Start && preview1) {
-    const t1 = parseTimeInput(s1Start.value, 8, 0);
-    const lessons1 = clampInt(s1Lessons ? s1Lessons.value : 6, SHIFT_LIMITS.lessons[0], SHIFT_LIMITS.lessons[1], 6);
-    const dur1 = clampInt(s1Duration ? s1Duration.value : 45, SHIFT_LIMITS.duration[0], SHIFT_LIMITS.duration[1], 45);
-    const brk1 = clampInt(s1Break ? s1Break.value : 5, SHIFT_LIMITS.breakDur[0], SHIFT_LIMITS.breakDur[1], 5);
-    const bigBrk1 = clampInt(s1BigBreak ? s1BigBreak.value : 5, SHIFT_LIMITS.bigBreak[0], SHIFT_LIMITS.bigBreak[1], 5);
+  listEl.innerHTML = '';
 
-    const tempSched1 = calculateSchoolSchedule({
-      startHour: t1.h,
-      startMinute: t1.m,
-      totalLessons: lessons1,
-      lessonDuration: dur1,
-      breakDuration: brk1,
-      longBreakDuration: bigBrk1,
-      shift: 1
-    });
-
-    const startStr = tempSched1[0] ? `${tempSched1[0].hour}:${tempSched1[0].minute}` : '08:00';
-    const endStr = tempSched1[tempSched1.length - 1] ? `${tempSched1[tempSched1.length - 1].hour}:${tempSched1[tempSched1.length - 1].minute}` : '12:55';
-    preview1.innerHTML = `📊 Hisoblangan: <b>${startStr} — ${endStr}</b> (${lessons1} ta dars, ${dur1} daq, tanaffus: ${brk1} daq, barchasida 1 daq Barkamol avlod)`;
+  if (bells.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.padding = '12px';
+    empty.style.textAlign = 'center';
+    empty.style.color = '#94a3b8';
+    empty.style.fontSize = '0.8rem';
+    empty.textContent = `Hozircha ${shift}-smena uchun qo'ng'iroq yo'q. "Qo'ng'iroq qo'shish" tugmasini bosing yoki parametrlardan yangilang.`;
+    listEl.appendChild(empty);
+    updateShiftCustomizerPreviews();
+    return;
   }
 
-  if (s2Start && preview2) {
-    const t2 = parseTimeInput(s2Start.value, 13, 10);
-    const lessons2 = clampInt(s2Lessons ? s2Lessons.value : 6, SHIFT_LIMITS.lessons[0], SHIFT_LIMITS.lessons[1], 6);
-    const dur2 = clampInt(s2Duration ? s2Duration.value : 45, SHIFT_LIMITS.duration[0], SHIFT_LIMITS.duration[1], 45);
-    const brk2 = clampInt(s2Break ? s2Break.value : 5, SHIFT_LIMITS.breakDur[0], SHIFT_LIMITS.breakDur[1], 5);
-    const bigBrk2 = clampInt(s2BigBreak ? s2BigBreak.value : 5, SHIFT_LIMITS.bigBreak[0], SHIFT_LIMITS.bigBreak[1], 5);
+  const soundOptions = [
+    { val: 'barkamol', label: '🎵 Barkamol avlod (MP3)' },
+    { val: 'qongiroq', label: '🔔 Qo\'ng\'iroq (MP3)' },
+    { val: 'school', label: '🏫 Zvonok' },
+    { val: 'melodic', label: '✨ Melodiya' },
+    { val: 'siren', label: '🚨 Signal' },
+    { val: 'gentle', label: '🌅 Chime' },
+    { val: 'classic', label: '⏰ Budilnik' }
+  ];
 
-    const tempSched2 = calculateSchoolSchedule({
-      startHour: t2.h,
-      startMinute: t2.m,
-      totalLessons: lessons2,
-      lessonDuration: dur2,
-      breakDuration: brk2,
-      longBreakDuration: bigBrk2,
-      shift: 2
+  bells.forEach((bell, idx) => {
+    const row = document.createElement('div');
+    row.className = 'shift-bell-row';
+
+    // Badge
+    const badge = document.createElement('div');
+    badge.className = 'shift-bell-idx';
+    const isEnd = bell.title && (bell.title.includes('yakun') || bell.title.includes('Oxirgi ohang'));
+    const isBreak = bell.title && bell.title.toLowerCase().includes('tanaffus');
+    badge.textContent = isEnd ? `🏁 ${idx + 1}` : (isBreak ? `☕ ${idx + 1}` : `🎵 ${idx + 1}`);
+    row.appendChild(badge);
+
+    // Time input
+    const timeInput = document.createElement('input');
+    timeInput.type = 'time';
+    timeInput.className = 'shift-bell-time-input';
+    timeInput.value = `${bell.hour}:${bell.minute}`;
+    timeInput.title = `${idx + 1}-qo'ng'iroq vaqti`;
+    timeInput.addEventListener('change', (e) => {
+      const parts = e.target.value.split(':');
+      if (parts.length >= 2) {
+        bell.hour = String(clampInt(parts[0], 0, 23, 0)).padStart(2, '0');
+        bell.minute = String(clampInt(parts[1], 0, 59, 0)).padStart(2, '0');
+        updateShiftCustomizerPreviews();
+      }
     });
+    row.appendChild(timeInput);
 
-    const startStr2 = tempSched2[0] ? `${tempSched2[0].hour}:${tempSched2[0].minute}` : '13:10';
-    const endStr2 = tempSched2[tempSched2.length - 1] ? `${tempSched2[tempSched2.length - 1].hour}:${tempSched2[tempSched2.length - 1].minute}` : '18:05';
-    preview2.innerHTML = `📊 Hisoblangan: <b>${startStr2} — ${endStr2}</b> (${lessons2} ta dars, ${dur2} daq, tanaffus: ${brk2} daq, barchasida 1 daq Barkamol avlod)`;
+    // Title input
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.className = 'shift-bell-title-input';
+    titleInput.value = bell.title || '';
+    titleInput.placeholder = "Dars yoki tanaffus nomi";
+    titleInput.maxLength = 50;
+    titleInput.title = "Dars nomi yoki qo'ng'iroq sababi";
+    titleInput.addEventListener('input', (e) => {
+      bell.title = cleanText(e.target.value, MAX_TITLE_LENGTH, "Dars qo'ng'irog'i");
+    });
+    row.appendChild(titleInput);
+
+    // Sound select
+    const soundSelect = document.createElement('select');
+    soundSelect.className = 'shift-bell-sound-select';
+    soundSelect.title = "Ohang / Musiqa";
+    soundOptions.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.val;
+      opt.textContent = s.label;
+      if (bell.sound === s.val) opt.selected = true;
+      soundSelect.appendChild(opt);
+    });
+    soundSelect.addEventListener('change', (e) => {
+      bell.sound = ALLOWED_SOUNDS.includes(e.target.value) ? e.target.value : 'barkamol';
+    });
+    row.appendChild(soundSelect);
+
+    // Remove button
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-remove-shift-bell';
+    removeBtn.title = "Ushbu qo'ng'iroqni ro'yxatdan o'chirish";
+    removeBtn.textContent = '🗑️';
+    removeBtn.addEventListener('click', () => {
+      bells.splice(idx, 1);
+      renderShiftBellsList(shift);
+      updateShiftCustomizerPreviews();
+    });
+    row.appendChild(removeBtn);
+
+    listEl.appendChild(row);
+  });
+
+  updateShiftCustomizerPreviews();
+}
+
+function addShiftBellRow(shift = 1) {
+  const isS2 = (shift === 2);
+  const sKey = isS2 ? 's2' : 's1';
+  const bells = STATE.editingShiftBells[sKey] || [];
+
+  let nextH = isS2 ? 18 : 13;
+  let nextM = 0;
+
+  if (bells.length > 0) {
+    const lastBell = bells[bells.length - 1];
+    let totalMin = parseInt(lastBell.hour, 10) * 60 + parseInt(lastBell.minute, 10) + 10;
+    nextH = Math.floor(totalMin / 60) % 24;
+    nextM = totalMin % 60;
+  }
+
+  const shiftLabel = `${shift}-smena: `;
+  const newBell = {
+    hour: String(nextH).padStart(2, '0'),
+    minute: String(nextM).padStart(2, '0'),
+    second: '00',
+    title: `${shiftLabel}${bells.length + 1}-Qo'ng'iroq (Barkamol avlod)`,
+    sound: 'barkamol',
+    durationSeconds: 60,
+    shift: shift
+  };
+
+  bells.push(newBell);
+  renderShiftBellsList(shift);
+  showToast(`➕ ${shift}-smenaga yangi qo'ng'iroq qo'shildi!`, "info");
+}
+
+function recalculateShiftFromForm(shift = 1) {
+  const isS2 = (shift === 2);
+  const startEl = isS2 ? (DOM.cfgS2Start || document.getElementById('cfgS2Start')) : (DOM.cfgS1Start || document.getElementById('cfgS1Start'));
+  const lessonsEl = isS2 ? (DOM.cfgS2Lessons || document.getElementById('cfgS2Lessons')) : (DOM.cfgS1Lessons || document.getElementById('cfgS1Lessons'));
+  const durEl = isS2 ? (DOM.cfgS2Duration || document.getElementById('cfgS2Duration')) : (DOM.cfgS1Duration || document.getElementById('cfgS1Duration'));
+  const brkEl = isS2 ? (DOM.cfgS2Break || document.getElementById('cfgS2Break')) : (DOM.cfgS1Break || document.getElementById('cfgS1Break'));
+  const bigBrkEl = isS2 ? (DOM.cfgS2BigBreak || document.getElementById('cfgS2BigBreak')) : (DOM.cfgS1BigBreak || document.getElementById('cfgS1BigBreak'));
+
+  const t = parseTimeInput(startEl ? startEl.value : (isS2 ? '13:10' : '08:00'), isS2 ? 13 : 8, isS2 ? 10 : 0);
+  const lessons = clampInt(lessonsEl ? lessonsEl.value : 6, SHIFT_LIMITS.lessons[0], SHIFT_LIMITS.lessons[1], 6);
+  const dur = clampInt(durEl ? durEl.value : 45, SHIFT_LIMITS.duration[0], SHIFT_LIMITS.duration[1], 45);
+  const brk = clampInt(brkEl ? brkEl.value : 5, SHIFT_LIMITS.breakDur[0], SHIFT_LIMITS.breakDur[1], 5);
+  const bigBrk = clampInt(bigBrkEl ? bigBrkEl.value : 5, SHIFT_LIMITS.bigBreak[0], SHIFT_LIMITS.bigBreak[1], 5);
+
+  const calculated = calculateSchoolSchedule({
+    startHour: t.h,
+    startMinute: t.m,
+    totalLessons: lessons,
+    lessonDuration: dur,
+    breakDuration: brk,
+    longBreakDuration: bigBrk,
+    shift: shift
+  });
+
+  const sKey = isS2 ? 's2' : 's1';
+  STATE.editingShiftBells[sKey] = calculated;
+  renderShiftBellsList(shift);
+  showToast(`⚡ ${shift}-smena qo'ng'iroqlari parametrlar asosida yangilandi!`, "info");
+}
+
+function updateShiftCustomizerPreviews() {
+  const preview1 = DOM.cfgS1Preview || document.getElementById('cfgS1Preview');
+  const preview2 = DOM.cfgS2Preview || document.getElementById('cfgS2Preview');
+
+  const b1 = (STATE.editingShiftBells && STATE.editingShiftBells.s1) ? STATE.editingShiftBells.s1 : [];
+  const b2 = (STATE.editingShiftBells && STATE.editingShiftBells.s2) ? STATE.editingShiftBells.s2 : [];
+
+  if (preview1) {
+    if (b1.length > 0) {
+      const first = b1[0];
+      const last = b1[b1.length - 1];
+      preview1.innerHTML = `📊 1-smena: <b>${first.hour}:${first.minute} — ${last.hour}:${last.minute}</b> (${b1.length} ta dars va tanaffus qo'ng'iroqlari)`;
+    } else {
+      preview1.innerHTML = `📊 1-smena: <b>08:00 — 12:55</b> (Standart)`;
+    }
+  }
+
+  if (preview2) {
+    if (b2.length > 0) {
+      const first = b2[0];
+      const last = b2[b2.length - 1];
+      preview2.innerHTML = `📊 2-smena: <b>${first.hour}:${first.minute} — ${last.hour}:${last.minute}</b> (${b2.length} ta dars va tanaffus qo'ng'iroqlari)`;
+    } else {
+      preview2.innerHTML = `📊 2-smena: <b>13:10 — 18:05</b> (Standart)`;
+    }
   }
 }
 
 function saveCustomShiftSettings() {
-  const s1Start = document.getElementById('cfgS1Start');
-  const s1Lessons = document.getElementById('cfgS1Lessons');
-  const s1Duration = document.getElementById('cfgS1Duration');
-  const s1Break = document.getElementById('cfgS1Break');
-  const s1BigBreak = document.getElementById('cfgS1BigBreak');
+  const sortBells = (list) => {
+    return [...list].sort((a, b) => {
+      const mA = parseInt(a.hour, 10) * 60 + parseInt(a.minute, 10);
+      const mB = parseInt(b.hour, 10) * 60 + parseInt(b.minute, 10);
+      return mA - mB;
+    });
+  };
 
-  const s2Start = document.getElementById('cfgS2Start');
-  const s2Lessons = document.getElementById('cfgS2Lessons');
-  const s2Duration = document.getElementById('cfgS2Duration');
-  const s2Break = document.getElementById('cfgS2Break');
-  const s2BigBreak = document.getElementById('cfgS2BigBreak');
+  const s1Sorted = sortBells(STATE.editingShiftBells.s1 || []);
+  const s2Sorted = sortBells(STATE.editingShiftBells.s2 || []);
+
+  if (s1Sorted.length === 0 || s2Sorted.length === 0) {
+    showToast("Har ikkala smenada kamida bittadan qo'ng'iroq bo'lishi lozim!", "warning");
+    return;
+  }
+
+  STATE.customShiftSchedules = {
+    s1: s1Sorted,
+    s2: s2Sorted
+  };
+
+  try {
+    localStorage.setItem(CUSTOM_SCHEDULES_KEY, JSON.stringify(STATE.customShiftSchedules));
+  } catch (e) {
+    console.error("Custom shift jadvalini saqlashda xatolik:", e);
+  }
+
+  // Also save base parameters from inputs
+  const s1Start = DOM.cfgS1Start || document.getElementById('cfgS1Start');
+  const s1Lessons = DOM.cfgS1Lessons || document.getElementById('cfgS1Lessons');
+  const s1Duration = DOM.cfgS1Duration || document.getElementById('cfgS1Duration');
+  const s1Break = DOM.cfgS1Break || document.getElementById('cfgS1Break');
+  const s1BigBreak = DOM.cfgS1BigBreak || document.getElementById('cfgS1BigBreak');
+
+  const s2Start = DOM.cfgS2Start || document.getElementById('cfgS2Start');
+  const s2Lessons = DOM.cfgS2Lessons || document.getElementById('cfgS2Lessons');
+  const s2Duration = DOM.cfgS2Duration || document.getElementById('cfgS2Duration');
+  const s2Break = DOM.cfgS2Break || document.getElementById('cfgS2Break');
+  const s2BigBreak = DOM.cfgS2BigBreak || document.getElementById('cfgS2BigBreak');
 
   const t1 = parseTimeInput(s1Start ? s1Start.value : '08:00', 8, 0);
   const t2 = parseTimeInput(s2Start ? s2Start.value : '13:10', 13, 10);
@@ -1143,11 +1392,11 @@ function saveCustomShiftSettings() {
   updateShiftButtonLabels();
   renderDynamicPresetChips();
 
-  const applyNow = confirm("✅ Yangi smena vaqtlari muvaffaqiyatli saqlandi!\n\nJoriy dars jadvaliga yangi vaqtlar hoziroq qo'llansinmi?");
+  const applyNow = confirm("✅ Standart 1- va 2-smena qo'ng'iroqlari muvaffaqiyatli saqlandi!\n\nJoriy dars jadvaliga yangilangan qo'ng'iroqlar hoziroq qo'llansinmi?");
   if (applyNow) {
     loadSchoolSchedule(1);
   } else {
-    showToast("⚙️ Smena sozlamalari muvaffaqiyatli saqlandi!", "success");
+    showToast("⚙️ Standart smena qo'ng'iroqlari saqlandi!", "success");
   }
 }
 
@@ -1156,24 +1405,27 @@ function resetCustomShiftSettings() {
     return;
   }
 
-  STATE.shiftSettings = JSON.parse(JSON.stringify(DEFAULT_SHIFT_SETTINGS));
+  STATE.customShiftSchedules = { s1: null, s2: null };
   try {
+    localStorage.removeItem(CUSTOM_SCHEDULES_KEY);
     localStorage.removeItem('smart_qongiroq_shift_settings');
   } catch (e) {
     console.error(e);
   }
 
-  const s1Start = document.getElementById('cfgS1Start');
-  const s1Lessons = document.getElementById('cfgS1Lessons');
-  const s1Duration = document.getElementById('cfgS1Duration');
-  const s1Break = document.getElementById('cfgS1Break');
-  const s1BigBreak = document.getElementById('cfgS1BigBreak');
+  STATE.shiftSettings = JSON.parse(JSON.stringify(DEFAULT_SHIFT_SETTINGS));
 
-  const s2Start = document.getElementById('cfgS2Start');
-  const s2Lessons = document.getElementById('cfgS2Lessons');
-  const s2Duration = document.getElementById('cfgS2Duration');
-  const s2Break = document.getElementById('cfgS2Break');
-  const s2BigBreak = document.getElementById('cfgS2BigBreak');
+  const s1Start = DOM.cfgS1Start || document.getElementById('cfgS1Start');
+  const s1Lessons = DOM.cfgS1Lessons || document.getElementById('cfgS1Lessons');
+  const s1Duration = DOM.cfgS1Duration || document.getElementById('cfgS1Duration');
+  const s1Break = DOM.cfgS1Break || document.getElementById('cfgS1Break');
+  const s1BigBreak = DOM.cfgS1BigBreak || document.getElementById('cfgS1BigBreak');
+
+  const s2Start = DOM.cfgS2Start || document.getElementById('cfgS2Start');
+  const s2Lessons = DOM.cfgS2Lessons || document.getElementById('cfgS2Lessons');
+  const s2Duration = DOM.cfgS2Duration || document.getElementById('cfgS2Duration');
+  const s2Break = DOM.cfgS2Break || document.getElementById('cfgS2Break');
+  const s2BigBreak = DOM.cfgS2BigBreak || document.getElementById('cfgS2BigBreak');
 
   if (s1Start) s1Start.value = "08:00";
   if (s1Lessons) s1Lessons.value = "6";
@@ -1187,6 +1439,11 @@ function resetCustomShiftSettings() {
   if (s2Break) s2Break.value = "5";
   if (s2BigBreak) s2BigBreak.value = "5";
 
+  STATE.editingShiftBells.s1 = getStandardSchoolSchedule(1);
+  STATE.editingShiftBells.s2 = getStandardSchoolSchedule(2);
+
+  renderShiftBellsList(1);
+  renderShiftBellsList(2);
   updateShiftCustomizerPreviews();
   updateShiftButtonLabels();
   renderDynamicPresetChips();
@@ -1618,16 +1875,55 @@ function renderAlarmsList() {
     chk.dataset.id = alarm.id;
     chk.checked = !!alarm.enabled;
     sw.append(chk, mk('span', 'slider'));
+    const edit = mk('button', 'btn-edit-alarm', '✏️');
+    edit.type = 'button';
+    edit.dataset.id = alarm.id;
+    edit.title = "Qo'ng'iroqni tahrirlash";
+
     const del = mk('button', 'btn-delete-alarm', '🗑️');
     del.type = 'button';
     del.dataset.id = alarm.id;
     del.title = "O'chirib tashlash";
-    right.append(sw, del);
+    right.append(sw, edit, del);
 
     item.append(left, right);
 
     DOM.alarmsList.appendChild(item);
   });
+}
+
+function openEditAlarmModal(id) {
+  const alarm = STATE.alarms.find(a => a.id === id);
+  if (!alarm) return;
+
+  if (DOM.editAlarmId) DOM.editAlarmId.value = alarm.id;
+  if (DOM.editAlarmHour) DOM.editAlarmHour.value = alarm.hour;
+  if (DOM.editAlarmMinute) DOM.editAlarmMinute.value = alarm.minute;
+  if (DOM.editAlarmSecond) DOM.editAlarmSecond.value = alarm.second || '00';
+  if (DOM.editAlarmTitle) DOM.editAlarmTitle.value = alarm.title || '';
+  if (DOM.editAlarmSound) DOM.editAlarmSound.value = alarm.sound || 'barkamol';
+
+  const durationSec = parseInt(alarm.durationSeconds, 10) || 60;
+  const radio = document.querySelector(`input[name="editRingDuration"][value="${durationSec}"]`);
+  if (radio) {
+    radio.checked = true;
+  } else {
+    const defaultRadio = document.querySelector(`input[name="editRingDuration"][value="60"]`);
+    if (defaultRadio) defaultRadio.checked = true;
+  }
+
+  if (DOM.editAlarmModal) {
+    DOM.editAlarmModal.style.display = 'flex';
+  }
+  if (DOM.editAlarmTitle) {
+    DOM.editAlarmTitle.focus();
+  }
+}
+
+function closeEditAlarmModal() {
+  if (DOM.editAlarmModal) {
+    DOM.editAlarmModal.style.display = 'none';
+  }
 }
 
 function updateAlarmsCountdownBadges() {
@@ -2004,9 +2300,17 @@ function setupEventListeners() {
     });
   }
 
-  // Bell list delegation (Toggle & Delete)
+  // Bell list delegation (Edit, Toggle & Delete)
   if (DOM.alarmsList) {
     DOM.alarmsList.addEventListener('click', (e) => {
+      // Edit button
+      const editBtn = e.target.closest('.btn-edit-alarm');
+      if (editBtn) {
+        const id = editBtn.dataset.id;
+        openEditAlarmModal(id);
+        return;
+      }
+
       // Delete button
       const delBtn = e.target.closest('.btn-delete-alarm');
       if (delBtn) {
@@ -2029,6 +2333,63 @@ function setupEventListeners() {
       }
     });
   }
+
+  // Edit Alarm Modal form submission
+  if (DOM.editAlarmForm) {
+    DOM.editAlarmForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = DOM.editAlarmId ? DOM.editAlarmId.value : null;
+      if (!id) return;
+
+      const alarm = STATE.alarms.find(a => a.id === id);
+      if (!alarm) return;
+
+      let h = parseInt(DOM.editAlarmHour.value || 0, 10);
+      let m = parseInt(DOM.editAlarmMinute.value || 0, 10);
+      let s = parseInt(DOM.editAlarmSecond.value || 0, 10);
+
+      if (isNaN(h) || h < 0 || h > 23) h = 0;
+      if (isNaN(m) || m < 0 || m > 59) m = 0;
+      if (isNaN(s) || s < 0 || s > 59) s = 0;
+
+      const title = cleanText(DOM.editAlarmTitle.value, MAX_TITLE_LENGTH, "Dars qo'ng'irog'i");
+      const sound = (DOM.editAlarmSound && ALLOWED_SOUNDS.includes(DOM.editAlarmSound.value)) ? DOM.editAlarmSound.value : "barkamol";
+
+      const durationRadio = document.querySelector('input[name="editRingDuration"]:checked');
+      const durationSeconds = durationRadio ? clampInt(durationRadio.value, 1, 60, 60) : 60;
+
+      alarm.hour = String(h).padStart(2, '0');
+      alarm.minute = String(m).padStart(2, '0');
+      alarm.second = String(s).padStart(2, '0');
+      alarm.title = title;
+      alarm.sound = sound;
+      alarm.durationSeconds = durationSeconds;
+
+      saveAlarms();
+      closeEditAlarmModal();
+      showToast("🔔 Qo'ng'iroq muvaffaqiyatli o'zgartirildi!", "success");
+    });
+  }
+
+  // Edit Alarm Modal buttons
+  if (DOM.closeEditModalBtn) {
+    DOM.closeEditModalBtn.addEventListener('click', closeEditAlarmModal);
+  }
+  if (DOM.cancelEditModalBtn) {
+    DOM.cancelEditModalBtn.addEventListener('click', closeEditAlarmModal);
+  }
+  if (DOM.editAlarmModal) {
+    DOM.editAlarmModal.addEventListener('click', (e) => {
+      if (e.target === DOM.editAlarmModal) {
+        closeEditAlarmModal();
+      }
+    });
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && DOM.editAlarmModal && DOM.editAlarmModal.style.display === 'flex') {
+      closeEditAlarmModal();
+    }
+  });
 
   // Clear all bells
   if (DOM.clearAllAlarmsBtn) {
